@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reserva de Eventos</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-calendar-check"></i> EventReserve
+            </a>
+            <div class="user-status">
+                <span class="badge bg-success">
+                    <i class="fas fa-users"></i> Usuários Online: <span id="online-users">0</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <!-- Status da Fila -->
+        <div id="queue-status" class="alert alert-info d-none">
+            <i class="fas fa-hourglass-half"></i>
+            Você está na fila de espera. Posição: <span id="queue-position">0</span>
+        </div>
+
+        <!-- Timer -->
+        <div id="timer-container" class="alert alert-warning d-none">
+            <i class="fas fa-clock"></i>
+            Tempo restante para escolha: <span id="timer" class="countdown">30</span>
+        </div>
+
+        <!-- Events Grid -->
+        <div class="row">
+            <div class="col-md-8">
+                <h2 class="section-title">Eventos Disponíveis</h2>
+                <div class="row" id="events-container">
+                    {% for event in events %}
+                    <div class="col-md-6 mb-4">
+                        <div class="event-card">
+                            <div class="event-header">
+                                <h3>{{ event.name }}</h3>
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-ticket-alt"></i>
+                                    {{ event.available_slots }} vagas
+                                </span>
+                            </div>
+                            <div class="event-body">
+                                <button class="btn btn-reserve" 
+                                        onclick="reserveEvent('{{ event.id }}')"
+                                        {% if event.available_slots == 0 %} disabled="disabled" {% endif %}>
+                                    <i class="fas fa-bookmark"></i>
+                                    {% if event.available_slots > 0 %}
+                                        Reservar
+                                    {% else %}
+                                        Esgotado
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-md-4">
+                <div class="sidebar">
+                    <div class="queue-list">
+                        <h3><i class="fas fa-list"></i> Fila de Espera</h3>
+                        <ul id="waiting-queue" class="list-group">
+                            <!-- Preenchido via JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const maxActiveUsers = 3;
+        let timerInterval;
+
+        // Adiciona o usuário à fila ao entrar na página e solicita atualização da contagem
+        socket.on('connect', function() {
+            socket.emit('join_queue');
+            socket.emit('request_user_count');
+        });
+
+        // Atualiza a contagem de usuários online
+        socket.on('update_online_users', function(data) {
+            document.getElementById('online-users').textContent = data.count;
+        });
+
+        // Função para reservar um evento
+        function reserveEvent(eventId) {
+            socket.emit('reserve_event', { event_id: eventId });
+        }
+
+        // Atualiza a lista de espera
+        socket.on('update_queue', function(data) {
+            const queueList = document.getElementById('waiting-queue');
+            queueList.innerHTML = '';
+            data.queue.forEach((user, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item';
+                listItem.textContent = `Usuário ${user} - Posição ${index + 1}`;
+                queueList.appendChild(listItem);
+            });
+        });
+
+        // Atualiza o status da fila
+        socket.on('in_queue', function(data) {
+            document.getElementById('queue-status').classList.remove('d-none');
+            document.getElementById('queue-position').textContent = data.position;
+        });
+
+        // Atualiza o timer
+        socket.on('update_timer', function(data) {
+            document.getElementById('timer-container').classList.remove('d-none');
+            document.getElementById('timer').textContent = data.time;
+        });
+
+        // Gerencia o temporizador para interação
+        socket.on('start_timer', function() {
+            let timeLeft = 30;
+            document.getElementById('timer').textContent = timeLeft;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    socket.emit('time_expired');
+                }
+            }, 1000);
+        });
+
+        // Para o temporizador quando o usuário sai da fila
+        socket.on('stop_timer', function() {
+            clearInterval(timerInterval);
+            document.getElementById('timer-container').classList.add('d-none');
+        });
+    </script>
+</body>
+</html>
