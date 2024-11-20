@@ -198,3 +198,55 @@ body {
     right: 20px;
     z-index: 1000;
 }
+
+.queue-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.queue-item {
+    padding: 12px 16px;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.queue-item:hover {
+    background-color: #f8f9fa;
+}
+
+.current-user {
+    border-left: 4px solid #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.active-user {
+    background-color: #d4edda !important;
+    border-color: #28a745;
+}
+
+.position-badge {
+    background-color: #6c757d;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+}
+
+.active-user .position-badge {
+    background-color: #28a745;
+}
+
+.user-name {
+    font-weight: 500;
+    color: #495057;
+}
+
+.current-user .user-name {
+    color: #0d6efd;
+}
+
+.active-user .user-name {
+    color: #155724;
+} 

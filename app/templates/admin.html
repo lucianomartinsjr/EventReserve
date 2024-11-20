@@ -19,7 +19,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
+                        <a class="nav-link" href="{{ url_for('main.index') }}">
                             <i class="fas fa-home"></i> Página Inicial
                         </a>
                     </li>
@@ -31,9 +31,54 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h2">Gerenciar Eventos</h1>
-            <a href="{{ url_for('create_event') }}" class="btn btn-success">
-                <i class="fas fa-plus"></i> Novo Evento
-            </a>
+            <div>
+                <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#configModal">
+                    <i class="fas fa-cog"></i> Configurações Gerais
+                </button>
+                <a href="{{ url_for('main.create_event') }}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Novo Evento
+                </a>
+            </div>
+        </div>
+
+        <!-- Modal de Configurações -->
+        <div class="modal fade" id="configModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Configurações do Sistema</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="{{ url_for('main.update_settings') }}" method="POST">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="max_users" class="form-label">Máximo de Usuários Simultâneos</label>
+                                <input type="number" class="form-control" id="max_users" name="max_users" 
+                                    value="{{ settings.max_users }}" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="choice_timeout" class="form-label">Tempo de Escolha (segundos)</label>
+                                <input type="number" class="form-control" id="choice_timeout" name="choice_timeout" 
+                                    value="{{ settings.choice_timeout }}" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="queue_timeout" class="form-label">Tempo de Fila (segundos)</label>
+                                <input type="number" class="form-control" id="queue_timeout" name="queue_timeout" 
+                                    value="{{ settings.queue_timeout }}" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="max_events" class="form-label">Número Máximo de Eventos</label>
+                                <input type="number" class="form-control" id="max_events" name="max_events" 
+                                    value="{{ settings.max_events }}" min="1" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="row">
@@ -54,7 +99,7 @@
                             </div>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <a href="{{ url_for('edit_event', event_id=event.id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ url_for('main.edit_event', event_id=event.id) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-edit"></i> Editar
                             </a>
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ event.id }}">
@@ -78,7 +123,7 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <form action="{{ url_for('delete_event', event_id=event.id) }}" method="POST" class="d-inline">
+                            <form action="{{ url_for('main.delete_event', event_id=event.id) }}" method="POST" class="d-inline">
                                 <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
                             </form>
                         </div>

@@ -37,7 +37,9 @@
         <!-- Timer -->
         <div id="timer-container" class="alert alert-warning d-none">
             <i class="fas fa-clock"></i>
-            Tempo restante para escolha: <span id="timer" class="countdown">30</span>
+            Tempo restante para escolha: <span id="timer" class="countdown">
+                <span class="minutes">00</span>:<span class="seconds">00</span>
+            </span>
         </div>
 
         <!-- Events Grid -->
@@ -47,7 +49,7 @@
                 <div class="row" id="events-container">
                     {% for event in events %}
                     <div class="col-md-6 mb-4">
-                        <div class="event-card">
+                        <div class="event-card" data-event-id="{{ event.id }}">
                             <div class="event-header">
                                 <h3>{{ event.name }}</h3>
                                 <span class="badge bg-primary">
@@ -71,14 +73,55 @@
                     </div>
                     {% endfor %}
                 </div>
+                <!-- Formulário de Confirmação -->
+                <div id="confirmation-form" class="modal fade" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Confirmar Reserva</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="reservationForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nome</label>
+                                        <input type="text" class="form-control" id="name" required minlength="3" maxlength="100">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Telefone</label>
+                                        <input type="tel" class="form-control" id="phone" required minlength="10" maxlength="20">
+                                    </div>
+                                    <div class="confirmation-timer alert alert-warning">
+                                        Tempo restante para confirmar: 
+                                        <span id="confirmation-countdown" class="countdown">
+                                            <span class="minutes">00</span>:<span class="seconds">00</span>
+                                        </span>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-primary" onclick="confirmReservation()">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Sidebar -->
             <div class="col-md-4">
                 <div class="sidebar">
+                    <!-- Adicionar seção de usuários ativos -->
+                    <div class="active-users mb-4">
+                        <h3><i class="fas fa-user-clock"></i> Usuários Ativos</h3>
+                        <ul id="active-users" class="list-group">
+                            <!-- Preenchido via JavaScript -->
+                        </ul>
+                    </div>
+                    
                     <div class="queue-list">
                         <h3><i class="fas fa-list"></i> Fila de Espera</h3>
-                        <ul id="waiting-queue" class="list-group">
+                        <ul id="waiting-queue" class="list-group queue-list-container">
                             <!-- Preenchido via JavaScript -->
                         </ul>
                     </div>
@@ -91,37 +134,188 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <script>
-        const socket = io();
-        const maxActiveUsers = 3;
+        const socket = io({
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 5
+        });
+        let isActive = false;
         let timerInterval;
+        let currentReservation = null;
+        let confirmationTimer = null;
 
-        // Adiciona o usuário à fila ao entrar na página e solicita atualização da contagem
+        // Adicionar handlers de conexão/desconexão
         socket.on('connect', function() {
-            socket.emit('join_queue');
-            socket.emit('request_user_count');
+            console.log('Conectado ao servidor');
+        });
+
+        socket.on('disconnect', function(reason) {
+            console.log('Desconectado do servidor:', reason);
+            // Limpar estado local
+            isActive = false;
+            if (timerInterval) clearInterval(timerInterval);
+            if (confirmationTimer) clearInterval(confirmationTimer);
+            
+            // Atualizar interface
+            document.getElementById('timer-container').classList.add('d-none');
+            document.getElementById('queue-status').classList.add('d-none');
+        });
+
+        socket.on('connect_error', function(error) {
+            console.log('Erro de conexão:', error);
+        });
+
+        socket.on('reconnect', function(attemptNumber) {
+            console.log('Reconectado após', attemptNumber, 'tentativas');
         });
 
         // Atualiza a contagem de usuários online
         socket.on('update_online_users', function(data) {
-            document.getElementById('online-users').textContent = data.count;
+            const onlineUsersElement = document.getElementById('online-users');
+            if (onlineUsersElement) {
+                onlineUsersElement.textContent = data.count;
+            }
+            console.log('Usuários online:', data.count);
         });
 
-        // Função para reservar um evento
-        function reserveEvent(eventId) {
-            socket.emit('reserve_event', { event_id: eventId });
-        }
+        // Quando receber acesso
+        socket.on('access_granted', function() {
+            console.log('Acesso concedido');
+            isActive = true;
+            document.getElementById('queue-status').classList.add('d-none');
+            document.getElementById('timer-container').classList.remove('d-none');
+        });
+
+        // Quando estiver na fila
+        socket.on('in_queue', function(data) {
+            console.log('Em fila, posição:', data.position);
+            isActive = false;
+            document.getElementById('queue-status').classList.remove('d-none');
+            document.getElementById('queue-position').textContent = data.position;
+            document.getElementById('timer-container').classList.add('d-none');
+        });
 
         // Atualiza a lista de espera
         socket.on('update_queue', function(data) {
+            console.log('Fila de espera:', data.queue);
             const queueList = document.getElementById('waiting-queue');
             queueList.innerHTML = '';
+            
             data.queue.forEach((user, index) => {
                 const listItem = document.createElement('li');
-                listItem.className = 'list-group-item';
-                listItem.textContent = `Usuário ${user} - Posição ${index + 1}`;
+                listItem.className = 'list-group-item d-flex justify-content-between align-items-center queue-item';
+                
+                const leftContent = document.createElement('div');
+                leftContent.className = 'd-flex align-items-center';
+                
+                const userIcon = document.createElement('i');
+                userIcon.className = 'fas fa-user me-2';
+                
+                const userText = document.createElement('span');
+                userText.className = 'user-name';
+                userText.textContent = `Usuário ${index + 1}`;
+                
+                const position = document.createElement('div');
+                position.className = 'd-flex align-items-center';
+                
+                const statusIcon = document.createElement('i');
+                statusIcon.className = index === 0 ? 'fas fa-circle text-success me-2' : 'fas fa-circle text-secondary me-2';
+                
+                const positionBadge = document.createElement('span');
+                positionBadge.className = 'badge position-badge';
+                positionBadge.textContent = `${index + 1}º`;
+                
+                leftContent.appendChild(userIcon);
+                leftContent.appendChild(userText);
+                
+                position.appendChild(statusIcon);
+                position.appendChild(positionBadge);
+                
+                listItem.appendChild(leftContent);
+                listItem.appendChild(position);
+                
+                if (user === socket.id) {
+                    listItem.classList.add('current-user');
+                    if (index === 0) {
+                        listItem.classList.add('active-user');
+                    }
+                }
+                
                 queueList.appendChild(listItem);
             });
         });
+
+        // Função auxiliar para formatar o tempo
+        function formatTime(timeInSeconds) {
+            const minutes = Math.floor(timeInSeconds / 60);
+            const seconds = timeInSeconds % 60;
+            return {
+                minutes: minutes.toString().padStart(2, '0'),
+                seconds: seconds.toString().padStart(2, '0')
+            };
+        }
+
+        // Função para atualizar visual do timer
+        function updateTimerDisplay(elementId, timeInSeconds) {
+            const timer = document.getElementById(elementId);
+            const formattedTime = formatTime(timeInSeconds);
+            
+            const minutesEl = timer.querySelector('.minutes');
+            const secondsEl = timer.querySelector('.seconds');
+            
+            // Atualiza os números
+            minutesEl.textContent = formattedTime.minutes;
+            secondsEl.textContent = formattedTime.seconds;
+            
+            // Adiciona classes para feedback visual
+            if (timeInSeconds <= 10) {
+                timer.classList.add('text-danger', 'fw-bold');
+            } else if (timeInSeconds <= 30) {
+                timer.classList.add('text-warning');
+                timer.classList.remove('text-danger', 'fw-bold');
+            } else {
+                timer.classList.remove('text-warning', 'text-danger', 'fw-bold');
+            }
+        }
+
+        // Atualização do timer de escolha
+        socket.on('start_timer', function(data) {
+            isActive = true;
+            let timeLeft = data.time;
+            const timerContainer = document.getElementById('timer-container');
+            
+            timerContainer.classList.remove('d-none');
+            updateTimerDisplay('timer', timeLeft);
+            
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay('timer', timeLeft);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    isActive = false;
+                    socket.emit('time_expired');
+                    timerContainer.classList.add('d-none');
+                }
+            }, 1000);
+        });
+
+        // Função para reservar evento
+        function reserveEvent(eventId) {
+            if (!isActive) {
+                alert('Você precisa estar ativo para fazer uma reserva!');
+                return;
+            }
+            
+            // Limpar formulário anterior
+            document.getElementById('name').value = '';
+            document.getElementById('phone').value = '';
+            
+            socket.emit('reserve_event', { event_id: eventId });
+        }
 
         // Atualiza o status da fila
         socket.on('in_queue', function(data) {
@@ -135,25 +329,233 @@
             document.getElementById('timer').textContent = data.time;
         });
 
-        // Gerencia o temporizador para interação
-        socket.on('start_timer', function() {
-            let timeLeft = 30;
-            document.getElementById('timer').textContent = timeLeft;
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').textContent = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    socket.emit('time_expired');
-                }
-            }, 1000);
-        });
-
         // Para o temporizador quando o usuário sai da fila
         socket.on('stop_timer', function() {
             clearInterval(timerInterval);
             document.getElementById('timer-container').classList.add('d-none');
         });
+
+        socket.on('reservation_created', function(data) {
+            currentReservation = {
+                id: data.reservation_id,
+                eventId: data.event_id,
+                expiresAt: new Date(data.expires_at)
+            };
+            
+            // Mostrar modal de confirmação
+            const confirmationModal = new bootstrap.Modal(document.getElementById('confirmation-form'));
+            confirmationModal.show();
+            
+            // Iniciar countdown
+            startConfirmationCountdown(new Date(data.expires_at));
+        });
+
+        // Atualização do timer de confirmação
+        function startConfirmationCountdown(expiresAt) {
+            const countdownElement = document.getElementById('confirmation-countdown');
+            
+            if (confirmationTimer) {
+                clearInterval(confirmationTimer);
+            }
+            
+            confirmationTimer = setInterval(() => {
+                const now = new Date();
+                const timeLeft = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                
+                updateTimerDisplay('confirmation-countdown', timeLeft);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(confirmationTimer);
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('confirmation-form'));
+                    modal.hide();
+                    currentReservation = null;
+                    
+                    // Feedback visual para o usuário
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Tempo Esgotado',
+                        text: 'O tempo para confirmar sua reserva expirou.',
+                        confirmButtonText: 'Entendi'
+                    });
+                }
+            }, 1000);
+        }
+
+        function confirmReservation() {
+            if (!currentReservation) return;
+            
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            
+            if (!name || !phone) {
+                alert('Por favor, preencha todos os campos');
+                return;
+            }
+            
+            socket.emit('confirm_reservation', {
+                reservation_id: currentReservation.id,
+                name: name,
+                phone: phone
+            });
+            
+            clearInterval(confirmationTimer);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmation-form'));
+            modal.hide();
+            currentReservation = null;
+        }
+
+        // Limpar timer quando o modal for fechado
+        document.getElementById('confirmation-form').addEventListener('hidden.bs.modal', function () {
+            if (confirmationTimer) {
+                clearInterval(confirmationTimer);
+            }
+            currentReservation = null;
+        });
+
+        // Adicionar handler para atualização de eventos
+        socket.on('event_updated', function(data) {
+            const eventCard = document.querySelector(`[data-event-id="${data.event_id}"]`);
+            if (eventCard) {
+                const slotsElement = eventCard.querySelector('.available-slots');
+                const reserveButton = eventCard.querySelector('.btn-reserve');
+                
+                slotsElement.textContent = data.available_slots;
+                
+                if (data.available_slots <= 0) {
+                    reserveButton.disabled = true;
+                    reserveButton.textContent = 'Esgotado';
+                } else {
+                    reserveButton.disabled = false;
+                    reserveButton.textContent = 'Reservar';
+                }
+            }
+        });
+
+        // Adicionar CSS para animações
+        const style = document.createElement('style');
+        style.textContent = `
+            .countdown {
+                font-family: 'Roboto Mono', monospace;
+                font-size: 1.2em;
+                transition: color 0.3s ease;
+            }
+            
+            .countdown.text-warning {
+                animation: pulse 1s infinite;
+            }
+            
+            .countdown.text-danger {
+                animation: pulse-danger 0.5s infinite;
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.8; }
+                100% { opacity: 1; }
+            }
+            
+            @keyframes pulse-danger {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.8; transform: scale(1.05); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Adicionar listener para atualização de usuários ativos
+        socket.on('update_active_users', function(data) {
+            const activeUsersList = document.getElementById('active-users');
+            if (!activeUsersList) return;
+            
+            activeUsersList.innerHTML = '';
+            
+            data.active_users.forEach((user, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item d-flex justify-content-between align-items-center queue-item';
+                
+                const leftContent = document.createElement('div');
+                leftContent.className = 'd-flex align-items-center';
+                
+                const userIcon = document.createElement('i');
+                userIcon.className = 'fas fa-user me-2';
+                
+                const userText = document.createElement('span');
+                userText.className = 'user-name';
+                userText.textContent = `Usuário ${user.id.substring(0, 6)}`;
+                
+                const statusIcon = document.createElement('i');
+                statusIcon.className = 'fas fa-circle status-icon';
+                statusIcon.title = 'Disponível para seleção';
+                
+                leftContent.appendChild(userIcon);
+                leftContent.appendChild(userText);
+                
+                listItem.appendChild(leftContent);
+                listItem.appendChild(statusIcon);
+                
+                if (user.id === socket.id) {
+                    listItem.classList.add('current-user');
+                    listItem.classList.add('active-user');
+                }
+                
+                activeUsersList.appendChild(listItem);
+            });
+        });
     </script>
+
+    <!-- Adicionar estilo CSS -->
+    <style>
+        .active-users {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .active-users h3 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        
+        .active-users .list-group-item {
+            margin-bottom: 8px;
+            border: 1px solid rgba(0,0,0,0.125);
+            border-radius: 6px;
+            padding: 12px 15px;
+        }
+        
+        .active-users .current-user {
+            background-color: rgba(25, 135, 84, 0.1);
+            border-color: #198754;
+        }
+        
+        .active-users .user-name {
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        
+        .status-icon {
+            color: #198754;
+            font-size: 12px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                opacity: 0.5;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 0.5;
+                transform: scale(1);
+            }
+        }
+    </style>
 </body>
 </html>
