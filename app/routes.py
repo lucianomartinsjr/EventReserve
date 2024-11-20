@@ -7,7 +7,7 @@ from config import Config
 @current_app.route('/')
 def index():
     events = Event.query.all()
-    return render_template('index.html', events=events, max_users=Config.MAX_USERS)
+    return render_template('index.html', events=events, max_users=Config.DEFAULT_MAX_USERS)
 
 @current_app.route('/admin')
 def admin():

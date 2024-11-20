@@ -7,6 +7,7 @@ class Event(db.Model):
     total_slots = db.Column(db.Integer, nullable=False)
     available_slots = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.DateTime, nullable=False)
     reservations = db.relationship('Reservation', backref='event', lazy=True)
 
 class Reservation(db.Model):
