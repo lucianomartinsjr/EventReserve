@@ -18,3 +18,24 @@ class Reservation(db.Model):
     status = db.Column(db.String(20), default='temporary')  # temporary, confirmed, cancelled
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
+
+class Settings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    max_users = db.Column(db.Integer, default=3)
+    choice_timeout = db.Column(db.Integer, default=120)  # tempo em segundos para escolher
+    queue_timeout = db.Column(db.Integer, default=300)   # tempo em segundos na fila
+    max_events = db.Column(db.Integer, default=5)        # máximo de eventos por usuário
+    
+    @classmethod
+    def get_settings(cls):
+        settings = cls.query.first()
+        if not settings:
+            settings = cls(
+                max_users=3,
+                choice_timeout=120,
+                queue_timeout=300,
+                max_events=5
+            )
+            db.session.add(settings)
+            db.session.commit()
+        return settings

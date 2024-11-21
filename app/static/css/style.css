@@ -198,3 +198,14 @@ body {
     right: 20px;
     z-index: 1000;
 }
+
+.active-users-list, .queue-list {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.list-group-item i {
+    margin-right: 8px;
+}

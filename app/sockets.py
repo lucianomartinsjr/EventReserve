@@ -13,20 +13,35 @@ def handle_connect():
     if events_manager.add_user(user_id):
         emit('access_granted')
     else:
-        queue_position = len(events_manager.waiting_queue)
-        emit('in_queue', {'position': queue_position})
-    # Adiciona o usuário à lista de usuários online
+        queue_position = events_manager.get_queue_position(user_id)
+        time_remaining = events_manager.get_queue_time_remaining(user_id)
+        emit('in_queue', {
+            'position': queue_position,
+            'time_remaining': time_remaining,
+            'queue_timeout': events_manager.queue_timeout
+        })
+    
     online_users.add(request.sid)
-    # Emite a contagem atualizada de usuários online para todos os clientes
+    
+    # Emite atualização de status para todos os usuários
+    emit('update_users_status', {
+        'active_users': list(events_manager.active_users),
+        'queue': list(events_manager.waiting_queue),
+        'max_users': events_manager.max_users
+    }, broadcast=True)
     emit('update_online_users', {'count': len(online_users)}, broadcast=True)
 
 @socketio.on('disconnect')
 def handle_disconnect():
     user_id = request.sid
     events_manager.remove_user(user_id)
-    # Remove o usuário da lista de usuários online
     online_users.discard(request.sid)
-    # Emite a contagem atualizada de usuários online para todos os clientes
+    
+    # Emite atualização de status para todos os usuários
+    emit('update_users_status', {
+        'active_users': list(events_manager.active_users),
+        'queue': list(events_manager.waiting_queue)
+    }, broadcast=True)
     emit('update_online_users', {'count': len(online_users)}, broadcast=True)
 
 @socketio.on('reserve_event')
@@ -38,7 +53,7 @@ def handle_reserve_event(data):
         # Criar reserva temporária
         reservation = Reservation(
             event_id=event_id,
-            expires_at=datetime.utcnow() + timedelta(minutes=2)
+            expires_at=datetime.utcnow() + timedelta(seconds=events_manager.choice_timeout)
         )
         db.session.add(reservation)
         event.available_slots -= 1
@@ -46,7 +61,8 @@ def handle_reserve_event(data):
         
         emit('reservation_created', {
             'reservation_id': reservation.id,
-            'expires_at': reservation.expires_at.isoformat()
+            'expires_at': reservation.expires_at.isoformat(),
+            'timeout': events_manager.choice_timeout
         })
         
         # Broadcast para todos os usuários

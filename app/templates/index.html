@@ -40,6 +40,12 @@
             Tempo restante para escolha: <span id="timer" class="countdown">30</span>
         </div>
 
+        <!-- Timer para Reserva -->
+        <div id="reservation-timer" class="alert alert-warning d-none">
+            <i class="fas fa-clock"></i>
+            Tempo restante para confirmar a reserva: <span id="reservation-countdown">0</span> segundos
+        </div>
+
         <!-- Events Grid -->
         <div class="row">
             <div class="col-md-8">
@@ -76,6 +82,14 @@
             <!-- Sidebar -->
             <div class="col-md-4">
                 <div class="sidebar">
+                    <!-- Adicionar seção de usuários ativos -->
+                    <div class="active-users-list mb-4">
+                        <h3><i class="fas fa-user-check"></i> Usuários Ativos</h3>
+                        <ul id="active-users" class="list-group">
+                            <!-- Preenchido via JavaScript -->
+                        </ul>
+                    </div>
+                    
                     <div class="queue-list">
                         <h3><i class="fas fa-list"></i> Fila de Espera</h3>
                         <ul id="waiting-queue" class="list-group">
@@ -111,14 +125,25 @@
             socket.emit('reserve_event', { event_id: eventId });
         }
 
-        // Atualiza a lista de espera
-        socket.on('update_queue', function(data) {
+        // Atualiza as listas de usuários ativos e fila de espera
+        socket.on('update_users_status', function(data) {
+            // Atualiza lista de usuários ativos
+            const activeList = document.getElementById('active-users');
+            activeList.innerHTML = '';
+            data.active_users.forEach((user, index) => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item list-group-item-success';
+                listItem.innerHTML = `<i class="fas fa-user"></i> Usuário ${user.slice(-4)}`;
+                activeList.appendChild(listItem);
+            });
+
+            // Atualiza lista de espera
             const queueList = document.getElementById('waiting-queue');
             queueList.innerHTML = '';
             data.queue.forEach((user, index) => {
                 const listItem = document.createElement('li');
-                listItem.className = 'list-group-item';
-                listItem.textContent = `Usuário ${user} - Posição ${index + 1}`;
+                listItem.className = 'list-group-item list-group-item-warning';
+                listItem.innerHTML = `<i class="fas fa-clock"></i> Usuário ${user.slice(-4)} - Posição ${index + 1}`;
                 queueList.appendChild(listItem);
             });
         });
@@ -153,6 +178,36 @@
         socket.on('stop_timer', function() {
             clearInterval(timerInterval);
             document.getElementById('timer-container').classList.add('d-none');
+        });
+
+        // Adicione estas novas funções para gerenciar o timer de reserva
+        let reservationTimerInterval;
+
+        socket.on('reservation_created', function(data) {
+            // Mostra o timer de reserva
+            document.getElementById('reservation-timer').classList.remove('d-none');
+            let timeLeft = data.timeout;
+            
+            // Atualiza o contador
+            const updateTimer = () => {
+                document.getElementById('reservation-countdown').textContent = timeLeft;
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearInterval(reservationTimerInterval);
+                    document.getElementById('reservation-timer').classList.add('d-none');
+                }
+            };
+
+            // Inicia o contador
+            updateTimer();
+            reservationTimerInterval = setInterval(updateTimer, 1000);
+        });
+
+        // Limpa o timer quando necessário
+        socket.on('reservation_confirmed', function() {
+            clearInterval(reservationTimerInterval);
+            document.getElementById('reservation-timer').classList.add('d-none');
         });
     </script>
 </body>
