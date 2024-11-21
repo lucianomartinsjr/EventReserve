@@ -143,7 +143,7 @@
             data.queue.forEach((user, index) => {
                 const listItem = document.createElement('li');
                 listItem.className = 'list-group-item list-group-item-warning';
-                listItem.innerHTML = `<i class="fas fa-clock"></i> Usuário ${user.slice(-4)} - Posição ${index + 1}`;
+                listItem.innerHTML = `<i class="fas fa-clock"></i> Usu��rio ${user.slice(-4)} - Posição ${index + 1}`;
                 queueList.appendChild(listItem);
             });
         });
@@ -208,6 +208,74 @@
         socket.on('reservation_confirmed', function() {
             clearInterval(reservationTimerInterval);
             document.getElementById('reservation-timer').classList.add('d-none');
+        });
+
+        // Adicione esta nova função para gerenciar o timer de interação
+        let interactionTimerInterval;
+
+        socket.on('access_granted', function() {
+            document.getElementById('queue-status').classList.add('d-none');
+        });
+
+        socket.on('start_interaction_timer', function(data) {
+            // Mostra o timer de interação
+            document.getElementById('timer-container').classList.remove('d-none');
+            let timeLeft = data.timeout;
+            
+            // Limpa qualquer timer existente
+            if (interactionTimerInterval) {
+                clearInterval(interactionTimerInterval);
+            }
+            
+            // Atualiza o contador
+            const updateInteractionTimer = () => {
+                document.getElementById('timer').textContent = timeLeft;
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearInterval(interactionTimerInterval);
+                    document.getElementById('timer-container').classList.add('d-none');
+                    // Envia evento de timeout para o servidor
+                    socket.emit('interaction_timeout');
+                }
+            };
+
+            // Inicia o contador
+            updateInteractionTimer();
+            interactionTimerInterval = setInterval(updateInteractionTimer, 1000);
+        });
+
+        // Adicione este novo listener para quando o usuário for movido para a fila
+        socket.on('moved_to_queue', function(data) {
+            // Esconde o container de timer
+            document.getElementById('timer-container').classList.add('d-none');
+            
+            // Mostra o status da fila
+            const queueStatus = document.getElementById('queue-status');
+            queueStatus.classList.remove('d-none');
+            document.getElementById('queue-position').textContent = data.position;
+            
+            // Mostra mensagem informativa
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Tempo esgotado!</strong> Você foi movido para o final da fila na posição ${data.position}.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            // Remove a mensagem após 5 segundos
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        });
+
+        // Limpa o timer quando o usuário desconectar
+        socket.on('disconnect', function() {
+            if (interactionTimerInterval) {
+                clearInterval(interactionTimerInterval);
+            }
+            document.getElementById('timer-container').classList.add('d-none');
         });
     </script>
 </body>

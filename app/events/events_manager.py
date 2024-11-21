@@ -83,5 +83,16 @@ class EventsManager:
         elapsed = (datetime.utcnow() - queue_time).total_seconds()
         remaining = max(0, self.queue_timeout - elapsed)
         return int(remaining)
+        
+    def move_to_end_of_queue(self, user_id):
+        with self.lock:
+            if user_id in self.active_users:
+                self.active_users.remove(user_id)
+                self.waiting_queue.append(user_id)
+                self.user_queue_times[user_id] = datetime.utcnow()
+                
+                # Processa o próximo usuário da fila
+                next_user = self._process_queue()
+                return next_user
 
 events_manager = EventsManager() 
