@@ -3,7 +3,7 @@ from flask_socketio import emit, join_room, leave_room
 from app import socketio, db
 from app.models import Event, Reservation, Settings
 from app.events.events_manager import events_manager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from app.utils.reservation_cleaner import clean_expired_reservations
 from sqlalchemy.sql import func
 from sqlalchemy import and_, or_
@@ -26,10 +26,12 @@ def broadcast_event_update(event_id):
 
 @socketio.on('connect')
 def handle_connect(auth=None):
-    # Limpa reservas expiradas quando um usuário se conecta
     clean_expired_reservations()
+    events_manager.cleanup_disconnected_users()
     user_id = request.sid
+    print(f"Usuário {user_id} conectou")  # Log de conexão
     if events_manager.add_user(user_id):
+        print(f"Acesso concedido para usuário {user_id}")  # Log de acesso
         emit('access_granted')
         emit('start_interaction_timer', {
             'timeout': events_manager.queue_timeout
@@ -37,6 +39,7 @@ def handle_connect(auth=None):
     else:
         queue_position = events_manager.get_queue_position(user_id)
         time_remaining = events_manager.get_queue_time_remaining(user_id)
+        print(f"Usuário {user_id} na fila: posição={queue_position}, tempo_restante={time_remaining}")  # Log de fila
         emit('in_queue', {
             'position': queue_position,
             'time_remaining': time_remaining,
@@ -44,16 +47,12 @@ def handle_connect(auth=None):
         })
     
     online_users.add(request.sid)
-    
-    # Emite atualização de status para todos os usuários
     emit('update_users_status', {
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue),
         'max_users': events_manager.max_users
     }, to=None)
     emit('update_online_users', {'count': len(online_users)}, to=None)
-    
-    # Adiciona atualização inicial das vagas para todos os eventos
     events = Event.query.all()
     for event in events:
         broadcast_event_update(event.id)
@@ -61,7 +60,9 @@ def handle_connect(auth=None):
 @socketio.on('disconnect')
 def handle_disconnect():
     user_id = request.sid
+    print(f"Usuário {user_id} desconectou")
     events_manager.remove_user(user_id)
+    events_manager.cleanup_disconnected_users()
     online_users.discard(request.sid)
     
     # Emite atualização de status para todos os usuários
@@ -74,71 +75,41 @@ def handle_disconnect():
 @socketio.on('reserve_event')
 def handle_reserve_event(data):
     try:
-        clean_expired_reservations()
         event_id = data.get('event_id')
         user_id = request.sid
-        
-        # Verifica se o evento existe
-        event = Event.query.get(event_id)
-        if not event:
-            emit('error', {'message': 'Evento não encontrado'})
-            return
-        
-        # Calcula vagas disponíveis
-        available_slots = get_available_slots(event_id)
-        print(f"Vagas disponíveis para evento {event_id}: {available_slots}") # Debug
-        
-        # Verifica se há vagas disponíveis
-        if available_slots <= 0:
-            emit('error', {'message': 'Não há mais vagas disponíveis para este evento'})
-            return
-            
         settings = Settings.get_settings()
+        
+        # Converte para segundos se necessário
         choice_timeout = settings.choice_timeout
+        if choice_timeout > 300:  # Se for maior que 5 minutos, provavelmente está em minutos
+            choice_timeout = 120  # Define para 2 minutos em segundos
         
-        # Verifica se já existe uma reserva temporária para este usuário
-        existing_reservation = Reservation.query.filter_by(
-            event_id=event_id,
-            session_id=user_id,
-            status='temporary'
-        ).first()
+        print(f"Timeout configurado: {choice_timeout} segundos")  # Debug
         
-        if existing_reservation:
-            emit('error', {'message': 'Você já possui uma reserva temporária para este evento'})
-            return
-        
-        # Verifica novamente se ainda há vagas antes de criar a reserva
-        if get_available_slots(event_id) <= 0:
-            emit('error', {'message': 'Desculpe, as vagas acabaram de ser preenchidas'})
-            return
-            
-        # Cria reserva temporária
+        # Criar reserva temporária
         reservation = Reservation(
             event_id=event_id,
             session_id=user_id,
             status='temporary',
-            expires_at=datetime.utcnow() + timedelta(minutes=choice_timeout)
+            expires_at=datetime.now(UTC) + timedelta(seconds=choice_timeout)
         )
         
         db.session.add(reservation)
         db.session.commit()
         
-        print(f"Reserva temporária criada: {reservation.id}") # Debug
-        
-        # Emite atualização imediata para todos
-        broadcast_event_update(event_id)
-        
-        # Mostra o modal de reserva
+        # Emitir evento para mostrar o modal com o timer
         emit('show_reservation_modal', {
             'event_id': event_id,
             'reservation_id': reservation.id,
-            'timeout': choice_timeout * 60
+            'timeout': choice_timeout  # Enviando em segundos
         })
-            
+        
+        # Atualizar contagem de vagas para todos
+        broadcast_event_update(event_id)
+        
     except Exception as e:
-        print(f"Erro ao processar reserva: {str(e)}") # Debug
-        db.session.rollback()
-        emit('error', {'message': 'Erro ao iniciar processo de reserva'})
+        print(f"Erro ao reservar evento: {str(e)}")
+        emit('error', {'message': 'Erro ao processar reserva'})
 
 # Adicionar novo handler para expiração de reservas
 @socketio.on('reservation_expired')
@@ -198,7 +169,7 @@ def handle_confirm_reservation(data):
     
     if reservation:
         try:
-            if datetime.utcnow() > reservation.expires_at:
+            if datetime.now(UTC) > reservation.expires_at:
                 db.session.delete(reservation)
                 db.session.commit()
                 emit('error', {'message': 'O tempo para confirmar a reserva expirou'})
@@ -295,7 +266,7 @@ def handle_create_temporary_reservation(data):
                 user_name=user_name,
                 user_phone=user_phone,
                 status='temporary',
-                expires_at=datetime.utcnow() + timedelta(minutes=choice_timeout)
+                expires_at=datetime.now(UTC) + timedelta(minutes=choice_timeout)
             )
             db.session.add(reservation)
             event.available_slots -= 1

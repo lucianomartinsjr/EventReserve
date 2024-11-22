@@ -530,7 +530,6 @@
     <script>
         const socket = io();
         const maxActiveUsers = 3;
-        let timerInterval;
 
         // Adiciona o usuário à fila ao entrar na página e solicita atualização da contagem
         socket.on('connect', function() {
@@ -575,18 +574,25 @@
             const reservationModal = new bootstrap.Modal(document.getElementById('reservationModal'));
             reservationModal.show();
             
-            // Inicia o timer no modal
+            // Converte o timeout para segundos se estiver em minutos
             let timeLeft = data.timeout;
+            console.log('Tempo inicial:', timeLeft); // Debug
             
             if (modalTimer) {
                 clearInterval(modalTimer);
             }
             
-            modalTimer = setInterval(() => {
+            const updateTimer = () => {
+                // Garante que o tempo está sendo tratado como segundos
                 const minutes = Math.floor(timeLeft / 60);
                 const seconds = timeLeft % 60;
+                
+                // Debug
+                console.log(`Tempo restante: ${minutes}:${seconds} (total segundos: ${timeLeft})`);
+                
+                // Formata o tempo com dois dígitos
                 document.getElementById('modal-timer').textContent = 
-                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                 
                 timeLeft--;
                 
@@ -599,7 +605,10 @@
                     currentEventId = null;
                     currentReservationId = null;
                 }
-            }, 1000);
+            };
+            
+            updateTimer(); // Atualiza imediatamente
+            modalTimer = setInterval(updateTimer, 1000); // Atualiza a cada segundo
         });
 
         // Atualiza as listas de usuários ativos e fila de espera
@@ -1093,6 +1102,47 @@
                     buttonElement.innerHTML = '<i class="fas fa-bookmark"></i> Reservar';
                 }
             }
+        });
+
+        // Função para formatar o tempo em MM:SS
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        let timerInterval;
+        let remainingTime;
+
+        socket.on('start_interaction_timer', function(data) {
+            remainingTime = data.timeout;
+            clearInterval(timerInterval);
+            
+            // Atualiza o timer imediatamente
+            document.getElementById('modal-timer').textContent = formatTime(remainingTime);
+            
+            timerInterval = setInterval(function() {
+                remainingTime--;
+                if (remainingTime >= 0) {
+                    document.getElementById('modal-timer').textContent = formatTime(remainingTime);
+                } else {
+                    clearInterval(timerInterval);
+                    // Fechar o modal de reserva se estiver aberto
+                    const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+                    if (reservationModal) {
+                        reservationModal.hide();
+                    }
+                    // Limpar a reserva temporária se existir
+                    if (currentEventId && currentReservationId) {
+                        cancelReservation();
+                    }
+                }
+            }, 1000); // Atualiza a cada segundo
+        });
+
+        // Limpar o timer quando o modal for fechado
+        document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
+            clearInterval(timerInterval);
         });
     </script>
 

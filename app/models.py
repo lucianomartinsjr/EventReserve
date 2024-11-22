@@ -23,9 +23,9 @@ class Reservation(db.Model):
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     max_users = db.Column(db.Integer, default=3)
-    choice_timeout = db.Column(db.Integer, default=120)  # tempo em segundos para escolher
-    queue_timeout = db.Column(db.Integer, default=300)   # tempo em segundos na fila
-    max_events = db.Column(db.Integer, default=5)        # máximo de eventos por usuário
+    choice_timeout = db.Column(db.Integer, default=30)  # tempo em segundos para escolher
+    queue_timeout = db.Column(db.Integer, default=120)   # tempo em segundos na fila
+    max_events = db.Column(db.Integer, default=10)        # máximo de eventos por usuário
     
     @classmethod
     def get_settings(cls):
@@ -33,8 +33,8 @@ class Settings(db.Model):
         if not settings:
             settings = cls(
                 max_users=3,
-                choice_timeout=120,
-                queue_timeout=300,
+                choice_timeout=30,
+                queue_timeout=120,
                 max_events=5
             )
             db.session.add(settings)

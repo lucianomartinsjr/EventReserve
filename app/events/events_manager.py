@@ -1,14 +1,22 @@
 from threading import Lock
 from collections import deque
 from datetime import datetime, timedelta
-from app import db
+from app import db, socketio
 from app.models import Settings
 
 class EventsManager:
-    def __init__(self):
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(EventsManager, cls).__new__(cls)
+            cls._instance.initialize()
+        return cls._instance
+    
+    def initialize(self):
         self.active_users = set()
         self.waiting_queue = deque()
-        self.user_queue_times = {}  # Armazena quando cada usuário entrou na fila
+        self.user_queue_times = {}
         self.lock = Lock()
         self._update_settings()
         
@@ -18,6 +26,7 @@ class EventsManager:
         self.queue_timeout = settings.queue_timeout
         self.choice_timeout = settings.choice_timeout
         self.max_events = settings.max_events
+        print(f"Configurações atualizadas: max_users={self.max_users}, queue_timeout={self.queue_timeout}")
         
     def add_user(self, user_id):
         with self.lock:
@@ -43,15 +52,20 @@ class EventsManager:
                 self.user_queue_times.pop(user_id, None)
                 
     def _clean_expired_queue_users(self):
-        """Remove usuários que excederam o tempo limite na fila"""
         current_time = datetime.utcnow()
         expired_users = []
         
         for user_id in list(self.waiting_queue):
             queue_time = self.user_queue_times.get(user_id)
-            if queue_time and (current_time - queue_time).total_seconds() > self.queue_timeout:
-                expired_users.append(user_id)
-                
+            if queue_time:
+                elapsed_time = (current_time - queue_time).total_seconds()
+                if elapsed_time > self.queue_timeout:
+                    expired_users.append(user_id)
+                    print(f"Usuário {user_id} removido da fila após {elapsed_time} segundos (timeout: {self.queue_timeout})")
+                    socketio.emit('queue_timeout', {
+                        'message': 'Seu tempo na fila expirou'
+                    }, room=user_id)
+        
         for user_id in expired_users:
             self.waiting_queue.remove(user_id)
             self.user_queue_times.pop(user_id, None)
@@ -94,5 +108,28 @@ class EventsManager:
                 # Processa o próximo usuário da fila
                 next_user = self._process_queue()
                 return next_user
+
+    def cleanup_disconnected_users(self):
+        """Remove usuários desconectados das listas ativas e da fila"""
+        with self.lock:
+            # Remove usuários inativos da fila ativa
+            for user_id in list(self.active_users):
+                try:
+                    # Verifica se o usuário ainda está na lista de rooms do socketio
+                    if not socketio.server.rooms.get(user_id):
+                        print(f"Removendo usuário inativo: {user_id}")
+                        self.remove_user(user_id)
+                except Exception as e:
+                    print(f"Erro ao verificar status do usuário {user_id}: {str(e)}")
+            
+            # Remove usuários inativos da fila de espera
+            for user_id in list(self.waiting_queue):
+                try:
+                    if not socketio.server.rooms.get(user_id):
+                        print(f"Removendo usuário inativo da fila: {user_id}")
+                        self.waiting_queue.remove(user_id)
+                        self.user_queue_times.pop(user_id, None)
+                except Exception as e:
+                    print(f"Erro ao verificar status do usuário na fila {user_id}: {str(e)}")
 
 events_manager = EventsManager() 
