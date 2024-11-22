@@ -224,6 +224,10 @@ def handle_cancel_reservation(data):
         ).with_for_update().first()
         
         if reservation:
+            # Calcula o tempo restante antes de cancelar a reserva
+            time_elapsed = (datetime.now(UTC) - reservation.created_at).total_seconds()
+            remaining_interaction_time = max(0, events_manager.queue_timeout - time_elapsed)
+            
             db.session.delete(reservation)
             db.session.commit()
             
@@ -239,7 +243,8 @@ def handle_cancel_reservation(data):
             
             emit('reservation_cancelled', {
                 'event_id': event_id,
-                'message': 'Reserva cancelada com sucesso'
+                'message': 'Reserva cancelada com sucesso',
+                'remaining_time': remaining_interaction_time
             })
             
         else:
