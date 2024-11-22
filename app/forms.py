@@ -1,34 +1,14 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, DateTimeField, IntegerField, SubmitField
-from wtforms.validators import DataRequired, NumberRange, Length
+from wtforms import StringField, IntegerField, SubmitField, DateTimeField
+from wtforms.validators import DataRequired, Length, NumberRange
 
 class ReservationForm(FlaskForm):
-    name = StringField('Nome', validators=[
-        DataRequired(message='Nome é obrigatório'),
-        Length(min=3, max=100, message='O nome deve ter entre 3 e 100 caracteres')
-    ])
-    phone = StringField('Telefone', validators=[
-        DataRequired(message='Telefone é obrigatório'),
-        Length(min=10, max=20, message='Telefone inválido')
-    ])
+    name = StringField('Nome', validators=[DataRequired(), Length(min=3, max=100)])
+    phone = StringField('Telefone', validators=[DataRequired(), Length(min=10, max=20)])
     submit = SubmitField('Confirmar Reserva')
 
 class EventForm(FlaskForm):
-    name = StringField('Nome do Evento', 
-        validators=[
-            DataRequired(message='Nome é obrigatório'),
-            Length(min=3, max=100, message='O nome deve ter entre 3 e 100 caracteres')
-        ])
-    
-    date = DateTimeField('Data do Evento',
-        validators=[DataRequired(message='Data é obrigatória')],
-        format='%Y-%m-%dT%H:%M',
-        render_kw={"type": "datetime-local"})
-    
-    total_slots = IntegerField('Total de Vagas',
-        validators=[
-            DataRequired(message='Número de vagas é obrigatório'),
-            NumberRange(min=1, message='O número de vagas deve ser maior que zero')
-        ])
-    
+    name = StringField('Nome do Evento', validators=[DataRequired(), Length(min=3, max=100)])
+    date = DateTimeField('Data do Evento', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
+    total_slots = IntegerField('Número de Vagas', validators=[DataRequired(), NumberRange(min=1)])
     submit = SubmitField('Criar Evento')
