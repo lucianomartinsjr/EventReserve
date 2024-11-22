@@ -37,7 +37,7 @@
         <!-- Timer -->
         <div id="timer-container" class="alert alert-warning d-none">
             <i class="fas fa-clock"></i>
-            Tempo restante para escolha: <span id="timer" class="countdown">30</span>
+            Tempo restante para escolha: <span id="timer" class="countdown">0</span>
         </div>
 
         <!-- Timer para Reserva -->
@@ -53,7 +53,7 @@
                 <div class="row" id="events-container">
                     {% for event in events %}
                     <div class="col-md-6 mb-4">
-                        <div class="event-card">
+                        <div class="event-card" data-event-id="{{ event.id }}">
                             <div class="event-header">
                                 <h3>{{ event.name }}</h3>
                                 <span class="badge bg-primary">
@@ -143,15 +143,32 @@
             data.queue.forEach((user, index) => {
                 const listItem = document.createElement('li');
                 listItem.className = 'list-group-item list-group-item-warning';
-                listItem.innerHTML = `<i class="fas fa-clock"></i> Usu��rio ${user.slice(-4)} - Posição ${index + 1}`;
+                listItem.innerHTML = `<i class="fas fa-clock"></i> Usuário ${user.slice(-4)} - Posição ${index + 1}`;
                 queueList.appendChild(listItem);
             });
         });
+
+        // Função para desabilitar todos os cards
+        function disableAllCards() {
+            const cards = document.querySelectorAll('.event-card');
+            cards.forEach(card => {
+                card.classList.add('disabled');
+            });
+        }
+
+        // Função para habilitar todos os cards
+        function enableAllCards() {
+            const cards = document.querySelectorAll('.event-card');
+            cards.forEach(card => {
+                card.classList.remove('disabled');
+            });
+        }
 
         // Atualiza o status da fila
         socket.on('in_queue', function(data) {
             document.getElementById('queue-status').classList.remove('d-none');
             document.getElementById('queue-position').textContent = data.position;
+            disableAllCards(); // Desabilita os cards quando estiver na fila
         });
 
         // Atualiza o timer
@@ -161,9 +178,15 @@
         });
 
         // Gerencia o temporizador para interação
-        socket.on('start_timer', function() {
-            let timeLeft = 30;
+        socket.on('start_timer', function(data) {
+            let timeLeft = data.timeout;
+            document.getElementById('timer-container').classList.remove('d-none');
             document.getElementById('timer').textContent = timeLeft;
+            
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
             timerInterval = setInterval(() => {
                 timeLeft--;
                 document.getElementById('timer').textContent = timeLeft;
@@ -215,9 +238,11 @@
 
         socket.on('access_granted', function() {
             document.getElementById('queue-status').classList.add('d-none');
+            enableAllCards(); // Habilita os cards quando sair da fila
         });
 
         socket.on('start_interaction_timer', function(data) {
+            console.log('Timeout recebido do servidor:', data.timeout);
             // Mostra o timer de interação
             document.getElementById('timer-container').classList.remove('d-none');
             let timeLeft = data.timeout;
@@ -247,13 +272,13 @@
 
         // Adicione este novo listener para quando o usuário for movido para a fila
         socket.on('moved_to_queue', function(data) {
-            // Esconde o container de timer
             document.getElementById('timer-container').classList.add('d-none');
             
-            // Mostra o status da fila
             const queueStatus = document.getElementById('queue-status');
             queueStatus.classList.remove('d-none');
             document.getElementById('queue-position').textContent = data.position;
+            
+            disableAllCards(); // Desabilita os cards quando for movido para a fila
             
             // Mostra mensagem informativa
             const alertDiv = document.createElement('div');
@@ -264,7 +289,6 @@
             `;
             document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
             
-            // Remove a mensagem após 5 segundos
             setTimeout(() => {
                 alertDiv.remove();
             }, 5000);
@@ -276,7 +300,114 @@
                 clearInterval(interactionTimerInterval);
             }
             document.getElementById('timer-container').classList.add('d-none');
+            disableAllCards(); // Desabilita os cards quando desconectar
+        });
+
+        let reservationTimer;
+
+        socket.on('reservation_created', function(data) {
+            // Inicia o timer com o timeout recebido do servidor
+            startReservationTimer(data.timeout);
+            
+            // Redireciona para a página de confirmação
+            window.location.href = `/reserve/${data.event_id}`;
+        });
+
+        function startReservationTimer(timeout) {
+            // Armazena o timestamp de expiração no localStorage
+            const expirationTime = Date.now() + (timeout * 1000);
+            localStorage.setItem('reservationExpiration', expirationTime);
+        }
+
+        // Adicionar função para verificar o timer na página de reserva
+        function checkReservationTimer() {
+            const expirationTime = localStorage.getItem('reservationExpiration');
+            if (expirationTime) {
+                const timeLeft = expirationTime - Date.now();
+                if (timeLeft <= 0) {
+                    // Tempo expirou
+                    window.location.href = '/';
+                    return;
+                }
+                
+                // Atualiza o contador na tela (se desejar mostrar)
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                document.getElementById('timer').textContent = 
+                    `Tempo restante: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Adicionar na página de reserva
+        if (document.getElementById('timer')) {
+            setInterval(checkReservationTimer, 1000);
+        }
+
+        socket.on('update_event_slots', function(data) {
+            const eventCard = document.querySelector(`[data-event-id="${data.event_id}"]`);
+            if (eventCard) {
+                const slotsElement = eventCard.querySelector('.available-slots');
+                slotsElement.textContent = `${data.available_slots} vagas`;
+                
+                const reserveButton = eventCard.querySelector('.btn-reserve');
+                if (data.available_slots === 0) {
+                    reserveButton.disabled = true;
+                    reserveButton.textContent = 'Esgotado';
+                }
+            }
+        });
+
+        // Adicionar novo handler para erros
+        socket.on('error', function(data) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Erro!</strong> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        });
+
+        // Adicionar handler para reserva confirmada
+        socket.on('reservation_success', function(data) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Sucesso!</strong> Sua reserva foi confirmada com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            setTimeout(() => {
+                alertDiv.remove();
+                window.location.href = '/';
+            }, 3000);
         });
     </script>
+
+    <!-- Modal de Tempo Expirado -->
+    <div class="modal fade" id="timeExpiredModal" tabindex="-1" aria-labelledby="timeExpiredModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="timeExpiredModalLabel">
+                        <i class="fas fa-exclamation-triangle"></i> Tempo Expirado
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Seu tempo para escolha do evento expirou! Você será movido para o final da fila.</p>
+                    <p>Nova posição na fila: <span id="newQueuePosition"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

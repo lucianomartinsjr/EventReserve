@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from app import db
 
 class Event(db.Model):
@@ -6,18 +6,19 @@ class Event(db.Model):
     name = db.Column(db.String(100), nullable=False)
     total_slots = db.Column(db.Integer, nullable=False)
     available_slots = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     date = db.Column(db.DateTime, nullable=False)
     reservations = db.relationship('Reservation', backref='event', lazy=True)
 
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
-    user_name = db.Column(db.String(100), nullable=False)
-    user_phone = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='temporary')  # temporary, confirmed, cancelled
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_name = db.Column(db.String(100))
+    user_phone = db.Column(db.String(20))
+    status = db.Column(db.String(20), default='temporary')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     expires_at = db.Column(db.DateTime)
+    session_id = db.Column(db.String(100))
 
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)

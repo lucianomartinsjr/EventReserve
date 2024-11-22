@@ -3,9 +3,11 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 import os
+from flask_migrate import Migrate
 
 db = SQLAlchemy()
 socketio = SocketIO()
+migrate = Migrate()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -19,6 +21,7 @@ def create_app(config_class=Config):
     
     db.init_app(app)
     socketio.init_app(app)
+    migrate.init_app(app, db)
     
     with app.app_context():
         from app import routes, sockets, models

@@ -1,4 +1,5 @@
 from flask import render_template, redirect, url_for, flash, request, current_app, session
+import socketio
 from app import db
 from app.models import Event, Reservation, Settings
 from app.forms import ReservationForm, EventForm
@@ -22,20 +23,44 @@ def admin():
 def reserve(event_id):
     form = ReservationForm()
     event = Event.query.get_or_404(event_id)
+    session_id = request.cookies.get('session_id')
+    
+    # Busca reserva temporária
+    reservation = Reservation.query.filter_by(
+        event_id=event_id,
+        session_id=session_id,
+        status='temporary'
+    ).first()
+    
+    if not reservation:
+        flash('Reserva temporária não encontrada ou expirada.', 'error')
+        return redirect(url_for('index'))
+    
+    if datetime.utcnow() > reservation.expires_at:
+        db.session.delete(reservation)
+        event.available_slots += 1
+        db.session.commit()
+        flash('O tempo para confirmar a reserva expirou.', 'error')
+        return redirect(url_for('index'))
     
     if form.validate_on_submit():
-        reservation = Reservation.query.filter_by(
-            event_id=event_id,
-            status='temporary'
-        ).first()
+        reservation.user_name = form.user_name.data
+        reservation.user_phone = form.user_phone.data
+        reservation.status = 'confirmed'
+        db.session.commit()
         
-        if reservation:
-            reservation.user_name = form.name.data
-            reservation.user_phone = form.phone.data
-            reservation.status = 'confirmed'
-            db.session.commit()
-            flash('Reserva confirmada com sucesso!')
-            return redirect(url_for('index'))
+        # Emite atualização via websocket
+        socketio.emit('update_event_slots', {
+            'event_id': event_id,
+            'available_slots': event.available_slots
+        }, broadcast=True)
+        
+        socketio.emit('reservation_success', {
+            'message': 'Reserva confirmada com sucesso!'
+        }, room=session_id)
+        
+        flash('Reserva confirmada com sucesso!', 'success')
+        return redirect(url_for('index'))
             
     return render_template('reservation.html', form=form, event=event)
 
