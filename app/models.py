@@ -8,15 +8,15 @@ class Event(db.Model):
     available_slots = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     date = db.Column(db.DateTime, nullable=False)
-    reservations = db.relationship('Reservation', backref='event', lazy=True)
+    reservations = db.relationship('Reservation', backref='event', lazy='joined')
 
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
     user_name = db.Column(db.String(100))
     user_phone = db.Column(db.String(20))
-    status = db.Column(db.String(20), default='temporary')
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+    status = db.Column(db.String(20), default='temporary')  # 'temporary' ou 'confirmed'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime)
     session_id = db.Column(db.String(100))
 
@@ -40,3 +40,21 @@ class Settings(db.Model):
             db.session.add(settings)
             db.session.commit()
         return settings
+
+class Users(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    isAdmin = db.Column(db.Boolean, default=False)
+
+    @classmethod
+    def init_default_admin(cls, app):
+        with app.app_context():
+            if not cls.query.filter_by(username=app.config['ADMIN_USERNAME']).first():
+                users = cls(
+                    username=app.config['ADMIN_USERNAME'],
+                    password=app.config['ADMIN_PASSWORD'],
+                    isAdmin=True
+                )
+                db.session.add(users)
+                db.session.commit()

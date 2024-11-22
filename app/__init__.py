@@ -26,6 +26,7 @@ def create_app(config_class=Config):
     with app.app_context():
         from app import routes, sockets, models
         db.create_all()
+        models.Users.init_default_admin(app)
         
     return app
 
