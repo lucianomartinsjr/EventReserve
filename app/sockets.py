@@ -29,9 +29,10 @@ def handle_connect(auth=None):
     clean_expired_reservations()
     events_manager.cleanup_disconnected_users()
     user_id = request.sid
-    print(f"Usuário {user_id} conectou")  # Log de conexão
+    print(f"Usuário {user_id} conectou")
+    
     if events_manager.add_user(user_id):
-        print(f"Acesso concedido para usuário {user_id}")  # Log de acesso
+        print(f"Acesso concedido para usuário {user_id}")
         emit('access_granted')
         emit('start_interaction_timer', {
             'timeout': events_manager.queue_timeout
@@ -39,7 +40,7 @@ def handle_connect(auth=None):
     else:
         queue_position = events_manager.get_queue_position(user_id)
         time_remaining = events_manager.get_queue_time_remaining(user_id)
-        print(f"Usuário {user_id} na fila: posição={queue_position}, tempo_restante={time_remaining}")  # Log de fila
+        print(f"Usuário {user_id} na fila: posição={queue_position}, tempo_restante={time_remaining}")
         emit('in_queue', {
             'position': queue_position,
             'time_remaining': time_remaining,
@@ -50,9 +51,10 @@ def handle_connect(auth=None):
     emit('update_users_status', {
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue),
-        'max_users': events_manager.max_users
-    }, to=None)
-    emit('update_online_users', {'count': len(online_users)}, to=None)
+        'max_users': events_manager.max_users,
+        'browser_info': events_manager.user_browser_info
+    }, broadcast=True)
+    emit('update_online_users', {'count': len(online_users)}, broadcast=True)
     events = Event.query.all()
     for event in events:
         broadcast_event_update(event.id)
@@ -286,3 +288,16 @@ def handle_create_temporary_reservation(data):
             emit('error', {'message': 'Erro ao criar reserva temporária'})
     else:
         emit('error', {'message': 'Não há mais vagas disponíveis para este evento'})
+
+@socketio.on('browser_info')
+def handle_browser_info(data):
+    """Handler para receber e armazenar informações do navegador"""
+    user_id = request.sid
+    events_manager.set_user_browser_info(user_id, data)
+    
+    # Atualiza o status para todos os usuários com as novas informações do navegador
+    emit('update_users_status', {
+        'active_users': list(events_manager.active_users),
+        'queue': list(events_manager.waiting_queue),
+        'browser_info': events_manager.user_browser_info
+    }, broadcast=True)

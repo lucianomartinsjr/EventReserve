@@ -525,9 +525,9 @@
             <!-- Sidebar -->
             <div class="col-md-4">
                 <div class="sidebar">
-                    <!-- Adicionar seção de usuários ativos -->
+                    <!-- Adicionar seção de sessões ativas -->
                     <div class="active-users-list mb-4">
-                        <h3><i class="fas fa-user-check"></i> Usuários Ativos</h3>
+                        <h3><i class="fas fa-user-check"></i> Sessões Ativas</h3>
                         <ul id="active-users" class="list-group">
                             <!-- Preenchido via JavaScript -->
                         </ul>
@@ -552,8 +552,60 @@
         const socket = io();
         const maxActiveUsers = 3;
 
-        // Adiciona o usuário à fila ao entrar na página e solicita atualização da contagem
+        // Adicione estas variáveis globais no início do script
+        let queueTimer;
+        let isModalOpen = false;
+
+        // Função para obter informações do navegador
+        function getBrowserInfo() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            let browser = '';
+            let icon = '';
+            let platform = '';
+
+            // Detecção mais precisa do navegador
+            if (userAgent.includes('edg/')) {
+                browser = 'Edge';
+                icon = 'fab fa-edge';
+            } else if (userAgent.includes('chrome/') && !userAgent.includes('edg/')) {
+                browser = 'Chrome';
+                icon = 'fab fa-chrome';
+            } else if (userAgent.includes('firefox/')) {
+                browser = 'Firefox';
+                icon = 'fab fa-firefox';
+            } else if (userAgent.includes('safari/') && !userAgent.includes('chrome/')) {
+                browser = 'Safari';
+                icon = 'fab fa-safari';
+            } else if (userAgent.includes('opr/')) {
+                browser = 'Opera';
+                icon = 'fab fa-opera';
+            } else {
+                browser = 'Navegador';
+                icon = 'fas fa-globe';
+            }
+
+            // Detecção mais precisa da plataforma
+            if (/android/i.test(userAgent)) {
+                platform = 'Android';
+            } else if (/iphone|ipad|ipod/i.test(userAgent)) {
+                platform = 'iOS';
+            } else if (/macintosh/i.test(userAgent)) {
+                platform = 'macOS';
+            } else if (/windows/i.test(userAgent)) {
+                platform = 'Windows';
+            } else if (/linux/i.test(userAgent)) {
+                platform = 'Linux';
+            } else {
+                platform = 'Desktop';
+            }
+
+            return { browser, icon, platform };
+        }
+
+        // Enviar informações do navegador ao conectar
         socket.on('connect', function() {
+            const browserInfo = getBrowserInfo();
+            socket.emit('browser_info', browserInfo);
             socket.emit('join_queue');
             socket.emit('request_user_count');
         });
@@ -567,13 +619,17 @@
         function reserveEvent(eventId) {
             const button = document.querySelector(`[data-event-id="${eventId}"] .btn-reserve`);
             if (button) {
-                button.disabled = true; // Desabilita o botão temporariamente
+                button.disabled = true;
             }
             
-            // Emite o evento para o servidor
-            socket.emit('reserve_event', { event_id: eventId });
+            // Pausa o timer da fila quando vai fazer a reserva
+            if (queueTimer) {
+                clearInterval(queueTimer);
+            }
             
-            // Adiciona um timeout para reabilitar o botão caso não haja resposta
+            socket.emit('reserve_event', { event_id: eventId });
+            isModalOpen = true; // Marca que o modal está aberto
+            
             setTimeout(() => {
                 if (button && !currentReservationId) {
                     button.disabled = false;
@@ -636,55 +692,58 @@
         let currentReservingUser = null;
         let currentReservingEvent = null;
 
-        // Atualize o listener de update_users_status
-        socket.on('update_users_status', function(data) {
-            // Atualiza as variáveis globais
-            currentReservingUser = data.reserving_user;
-            currentReservingEvent = data.event_id;
+        // Função atualizada para criar o item da lista
+        function createUserListItem(user, isQueue = false, queuePosition = null) {
+            const browserInfo = socket.browserInfo?.[user] || { 
+                browser: 'Desconhecido', 
+                icon: 'fas fa-globe', 
+                platform: 'Desconhecido' 
+            };
+            const isReserving = user === currentReservingUser;
             
-            // Atualiza lista de usuários ativos
-            const activeList = document.getElementById('active-users');
-            activeList.innerHTML = '';
-            data.active_users.forEach((user) => {
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-                
-                // Verifica se este usuário está fazendo uma reserva
-                const isReserving = user === currentReservingUser;
-                const statusText = isReserving ? 'Confirmando reserva' : 'Apto para selecionar';
-                const statusClass = isReserving ? 'bg-warning text-dark' : 'bg-success';
-                const iconClass = isReserving ? 'fa-clock' : 'fa-check-circle';
-                
-                listItem.innerHTML = `
-                    <div>
-                        <i class="fas fa-user"></i> Usuário ${user.slice(-4)}
-                        ${user === socket.id ? ' (Você)' : ''}
-                    </div>
-                    <span class="badge ${statusClass}">
-                        <i class="fas ${iconClass} me-1"></i>
-                        ${statusText}
-                    </span>
-                `;
-                activeList.appendChild(listItem);
-            });
+            const status = isQueue ? {
+                text: `Posição ${queuePosition + 1}`,
+                class: 'bg-warning text-dark',
+                icon: 'fa-clock'
+            } : {
+                text: isReserving ? 'Confirmando reserva' : 'Apto para selecionar',
+                class: isReserving ? 'bg-warning text-dark' : 'bg-success',
+                icon: isReserving ? 'fa-clock' : 'fa-check-circle'
+            };
 
-            // Atualiza lista de espera
-            const queueList = document.getElementById('waiting-queue');
-            queueList.innerHTML = '';
-            data.queue.forEach((user, index) => {
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item list-group-item-warning d-flex justify-content-between align-items-center';
-                listItem.innerHTML = `
-                    <div>
-                        <i class="fas fa-clock"></i> Usuário ${user.slice(-4)}
-                        ${user === socket.id ? ' (Você)' : ''}
+            return `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="d-flex flex-column">
+                        <div>
+                            <i class="fas ${isQueue ? 'fa-clock' : 'fa-user'}"></i>
+                            Session_${user.slice(-6).toUpperCase()}
+                            ${user === socket.id ? ' (Você)' : ''}
+                        </div>
+                        <small class="text-muted">
+                            <i class="${browserInfo.icon}"></i> ${browserInfo.browser} em ${browserInfo.platform}
+                        </small>
                     </div>
-                    <span class="badge bg-warning text-dark">
-                        Posição ${index + 1}
+                    <span class="badge ${status.class}">
+                        <i class="fas ${status.icon} me-1"></i>
+                        ${status.text}
                     </span>
-                `;
-                queueList.appendChild(listItem);
-            });
+                </li>
+            `;
+        }
+
+        // Atualizar o listener de status
+        socket.on('update_users_status', function(data) {
+            socket.browserInfo = data.browser_info;  // Armazena as informações do navegador
+            const activeList = document.getElementById('active-users');
+            const queueList = document.getElementById('waiting-queue');
+            
+            activeList.innerHTML = data.active_users
+                .map(user => createUserListItem(user))
+                .join('');
+            
+            queueList.innerHTML = data.queue
+                .map((user, index) => createUserListItem(user, true, index))
+                .join('');
         });
 
         // Função para desabilitar todos os cards
@@ -722,23 +781,25 @@
             document.getElementById('timer-container').classList.remove('d-none');
             let timeLeft = data.timeout;
             
-            if (interactionTimerInterval) {
-                clearInterval(interactionTimerInterval);
-            }
-            
-            const updateInteractionTimer = () => {
-                document.getElementById('timer').textContent = timeLeft;
-                timeLeft--;
-                
-                if (timeLeft < 0) {
-                    clearInterval(interactionTimerInterval);
-                    document.getElementById('timer-container').classList.add('d-none');
-                    socket.emit('interaction_timeout');
+            if (!isModalOpen) { // Só inicia o timer se o modal não estiver aberto
+                if (queueTimer) {
+                    clearInterval(queueTimer);
                 }
-            };
+                
+                const updateInteractionTimer = () => {
+                    document.getElementById('timer').textContent = timeLeft;
+                    timeLeft--;
+                    
+                    if (timeLeft < 0) {
+                        clearInterval(queueTimer);
+                        document.getElementById('timer-container').classList.add('d-none');
+                        socket.emit('interaction_timeout');
+                    }
+                };
 
-            updateInteractionTimer();
-            interactionTimerInterval = setInterval(updateInteractionTimer, 1000);
+                updateInteractionTimer();
+                queueTimer = setInterval(updateInteractionTimer, 1000);
+            }
         });
 
         // Para o temporizador quando o usuário sai da fila
@@ -1023,19 +1084,20 @@
                 clearInterval(modalTimer);
             }
             
-            // Reabilita o botão de reserva do evento atual
             const button = document.querySelector(`[data-event-id="${currentEventId}"] .btn-reserve`);
             if (button) {
                 button.disabled = false;
             }
             
-            // Fecha o modal
             const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
             if (reservationModal) {
                 reservationModal.hide();
             }
             
-            // Limpa as variáveis de controle
+            // Reinicia o timer da fila quando cancela a reserva
+            socket.emit('request_queue_time');
+            isModalOpen = false;
+            
             currentEventId = null;
             currentReservationId = null;
         }
@@ -1095,7 +1157,8 @@
 
         // Atualizar o listener do modal
         document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
-            cancelReservation();
+            isModalOpen = false;
+            socket.emit('request_queue_time'); // Solicita atualização do tempo da fila
         });
 
         // Adicionar este novo listener para atualização das vagas

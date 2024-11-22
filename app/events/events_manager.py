@@ -17,6 +17,7 @@ class EventsManager:
         self.active_users = set()
         self.waiting_queue = deque()
         self.user_queue_times = {}
+        self.user_browser_info = {}
         self.lock = Lock()
         self._update_settings()
         
@@ -41,16 +42,20 @@ class EventsManager:
             self.user_queue_times[user_id] = datetime.utcnow()
             return False
             
+    def set_user_browser_info(self, user_id, browser_info):
+        """Armazena as informações do navegador do usuário"""
+        with self.lock:
+            self.user_browser_info[user_id] = browser_info
+            
     def remove_user(self, user_id):
         with self.lock:
             if user_id in self.active_users:
                 self.active_users.remove(user_id)
-                next_user = self._process_queue()
-                return next_user
             if user_id in self.waiting_queue:
                 self.waiting_queue.remove(user_id)
-                self.user_queue_times.pop(user_id, None)
-                
+            self.user_queue_times.pop(user_id, None)
+            self.user_browser_info.pop(user_id, None)
+            
     def _clean_expired_queue_users(self):
         current_time = datetime.utcnow()
         expired_users = []
