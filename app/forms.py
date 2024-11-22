@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SubmitField
+from wtforms import StringField, IntegerField, SubmitField, DateTimeField
 from wtforms.validators import DataRequired, Length, NumberRange
 
 class ReservationForm(FlaskForm):
@@ -9,5 +9,6 @@ class ReservationForm(FlaskForm):
 
 class EventForm(FlaskForm):
     name = StringField('Nome do Evento', validators=[DataRequired(), Length(min=3, max=100)])
+    date = DateTimeField('Data do Evento', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
     total_slots = IntegerField('Número de Vagas', validators=[DataRequired(), NumberRange(min=1)])
     submit = SubmitField('Criar Evento')
