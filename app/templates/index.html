@@ -429,6 +429,27 @@
         .modal-footer .btn-reserve {
             color: white;
         }
+
+        .list-group-item {
+            border: none;
+            margin-bottom: 0.5rem;
+            border-radius: 10px !important;
+            background-color: #f8f9fa;
+        }
+
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: normal;
+        }
+
+        .badge.bg-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+        }
+
+        .badge.bg-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+        }
     </style>
 </head>
 <body>
@@ -611,24 +632,39 @@
             modalTimer = setInterval(updateTimer, 1000); // Atualiza a cada segundo
         });
 
-        // Atualiza as listas de usuários ativos e fila de espera
+        // Adicione estas variáveis globais
+        let currentReservingUser = null;
+        let currentReservingEvent = null;
+
+        // Atualize o listener de update_users_status
         socket.on('update_users_status', function(data) {
+            // Atualiza as variáveis globais
+            currentReservingUser = data.reserving_user;
+            currentReservingEvent = data.event_id;
+            
             // Atualiza lista de usuários ativos
             const activeList = document.getElementById('active-users');
             activeList.innerHTML = '';
-            data.active_users.forEach((user, index) => {
+            data.active_users.forEach((user) => {
                 const listItem = document.createElement('li');
-                listItem.className = 'list-group-item list-group-item-success';
+                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                
+                // Verifica se este usuário está fazendo uma reserva
+                const isReserving = user === currentReservingUser;
+                const statusText = isReserving ? 'Confirmando reserva' : 'Apto para selecionar';
+                const statusClass = isReserving ? 'bg-warning text-dark' : 'bg-success';
+                const iconClass = isReserving ? 'fa-clock' : 'fa-check-circle';
+                
                 listItem.innerHTML = `
                     <div>
                         <i class="fas fa-user"></i> Usuário ${user.slice(-4)}
-                        <div class="progress mt-2" style="height: 5px;">
-                            <div class="progress-bar bg-info" role="progressbar" 
-                                 id="progress-${user}" style="width: 100%;" 
-                                 aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                    </div>`;
+                        ${user === socket.id ? ' (Você)' : ''}
+                    </div>
+                    <span class="badge ${statusClass}">
+                        <i class="fas ${iconClass} me-1"></i>
+                        ${statusText}
+                    </span>
+                `;
                 activeList.appendChild(listItem);
             });
 
@@ -637,8 +673,16 @@
             queueList.innerHTML = '';
             data.queue.forEach((user, index) => {
                 const listItem = document.createElement('li');
-                listItem.className = 'list-group-item list-group-item-warning';
-                listItem.innerHTML = `<i class="fas fa-clock"></i> Usuário ${user.slice(-4)} - Posição ${index + 1}`;
+                listItem.className = 'list-group-item list-group-item-warning d-flex justify-content-between align-items-center';
+                listItem.innerHTML = `
+                    <div>
+                        <i class="fas fa-clock"></i> Usuário ${user.slice(-4)}
+                        ${user === socket.id ? ' (Você)' : ''}
+                    </div>
+                    <span class="badge bg-warning text-dark">
+                        Posição ${index + 1}
+                    </span>
+                `;
                 queueList.appendChild(listItem);
             });
         });
@@ -961,10 +1005,13 @@
                 user_name: userName,
                 user_phone: userPhone
             });
+
+            // Limpa o status de reserva
+            currentReservingUser = null;
+            currentReservingEvent = null;
         }
 
         function cancelReservation() {
-            console.log('Cancelando reserva:', currentEventId, currentReservationId); // Debug
             if (currentEventId && currentReservationId) {
                 socket.emit('cancel_reservation', {
                     event_id: currentEventId,

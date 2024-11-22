@@ -79,12 +79,9 @@ def handle_reserve_event(data):
         user_id = request.sid
         settings = Settings.get_settings()
         
-        # Converte para segundos se necessário
         choice_timeout = settings.choice_timeout
-        if choice_timeout > 300:  # Se for maior que 5 minutos, provavelmente está em minutos
-            choice_timeout = 120  # Define para 2 minutos em segundos
-        
-        print(f"Timeout configurado: {choice_timeout} segundos")  # Debug
+        if choice_timeout > 300:
+            choice_timeout = 120
         
         # Criar reserva temporária
         reservation = Reservation(
@@ -101,8 +98,16 @@ def handle_reserve_event(data):
         emit('show_reservation_modal', {
             'event_id': event_id,
             'reservation_id': reservation.id,
-            'timeout': choice_timeout  # Enviando em segundos
+            'timeout': choice_timeout
         })
+        
+        # Atualizar status para todos os usuários
+        socketio.emit('update_users_status', {
+            'active_users': list(events_manager.active_users),
+            'queue': list(events_manager.waiting_queue),
+            'reserving_user': user_id,
+            'event_id': event_id
+        }, broadcast=True)
         
         # Atualizar contagem de vagas para todos
         broadcast_event_update(event_id)
@@ -210,9 +215,6 @@ def handle_cancel_reservation(data):
     user_id = request.sid
     
     try:
-        print(f"Cancelando reserva: event_id={event_id}, reservation_id={reservation_id}") # Debug
-        
-        # Busca a reserva com lock para evitar condições de corrida
         reservation = Reservation.query.filter_by(
             id=reservation_id,
             event_id=event_id,
@@ -223,9 +225,14 @@ def handle_cancel_reservation(data):
             db.session.delete(reservation)
             db.session.commit()
             
-            print(f"Reserva {reservation_id} cancelada com sucesso") # Debug
+            # Atualizar status para todos os usuários
+            socketio.emit('update_users_status', {
+                'active_users': list(events_manager.active_users),
+                'queue': list(events_manager.waiting_queue),
+                'reserving_user': None,
+                'event_id': None
+            }, broadcast=True)
             
-            # Broadcast da atualização de vagas
             broadcast_event_update(event_id)
             
             emit('reservation_cancelled', {
@@ -233,16 +240,10 @@ def handle_cancel_reservation(data):
                 'message': 'Reserva cancelada com sucesso'
             })
             
-            # Emite evento para reabilitar o botão
-            emit('enable_reserve_button', {
-                'event_id': event_id
-            })
         else:
-            print(f"Reserva não encontrada: event_id={event_id}, reservation_id={reservation_id}") # Debug
             emit('error', {'message': 'Reserva não encontrada ou já expirada'})
             
     except Exception as e:
-        print(f"Erro ao cancelar reserva: {str(e)}") # Debug
         db.session.rollback()
         emit('error', {'message': 'Erro ao cancelar reserva'})
 
