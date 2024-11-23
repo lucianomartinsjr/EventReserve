@@ -17,7 +17,7 @@ class Reservation(db.Model):
     user_phone = db.Column(db.String(20))
     status = db.Column(db.String(20), default='temporary')  # 'temporary' ou 'confirmed'
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    expires_at = db.Column(db.DateTime)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
     session_id = db.Column(db.String(100))
 
 class Settings(db.Model):

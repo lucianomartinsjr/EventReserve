@@ -1078,15 +1078,14 @@
                     event_id: currentEventId,
                     reservation_id: currentReservationId
                 });
+                
+                // Limpa as variáveis de controle
+                currentEventId = null;
+                currentReservationId = null;
             }
             
             if (modalTimer) {
                 clearInterval(modalTimer);
-            }
-            
-            const button = document.querySelector(`[data-event-id="${currentEventId}"] .btn-reserve`);
-            if (button) {
-                button.disabled = false;
             }
             
             const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
@@ -1094,12 +1093,9 @@
                 reservationModal.hide();
             }
             
-            // Reinicia o timer da fila quando cancela a reserva
+            // Reinicia o timer da fila
             socket.emit('request_queue_time');
             isModalOpen = false;
-            
-            currentEventId = null;
-            currentReservationId = null;
         }
 
         socket.on('reservation_success', function(data) {
@@ -1157,8 +1153,19 @@
 
         // Atualizar o listener do modal
         document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
+            if (currentEventId && currentReservationId) {
+                socket.emit('modal_closed', {
+                    event_id: currentEventId,
+                    reservation_id: currentReservationId
+                });
+                
+                // Limpa as variáveis de controle
+                currentEventId = null;
+                currentReservationId = null;
+            }
+            
             isModalOpen = false;
-            socket.emit('request_queue_time'); // Solicita atualização do tempo da fila
+            socket.emit('request_queue_time');
         });
 
         // Adicionar este novo listener para atualização das vagas
@@ -1253,6 +1260,20 @@
         // Limpar o timer quando o modal for fechado
         document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
             clearInterval(timerInterval);
+        });
+
+        window.addEventListener('beforeunload', function(e) {
+            if (currentEventId && currentReservationId) {
+                // Envia evento de página fechada de forma síncrona
+                navigator.sendBeacon(
+                    '/api/cancel_reservation', 
+                    JSON.stringify({
+                        event_id: currentEventId,
+                        reservation_id: currentReservationId,
+                        type: 'page_closed'
+                    })
+                );
+            }
         });
     </script>
 

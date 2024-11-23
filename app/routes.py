@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request, current_app, session, jsonify
+from flask import render_template, redirect, url_for, flash, request, current_app, session, jsonify, Response
 import socketio
 from app import db
 from app.models import Event, Reservation, Settings, Users
@@ -12,6 +12,7 @@ from app.utils.reservation_cleaner import clean_expired_reservations
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, and_
 from functools import wraps
+import json
 
 def admin_required(f):
     @wraps(f)
@@ -216,3 +217,39 @@ def get_event_reservations(event_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@current_app.route('/api/cancel_reservation', methods=['POST'])
+def handle_page_close_reservation():
+    try:
+        data = json.loads(request.data)
+        event_id = data.get('event_id')
+        reservation_id = data.get('reservation_id')
+        
+        # Busca a reserva temporária
+        reservation = Reservation.query.filter_by(
+            id=reservation_id,
+            event_id=event_id,
+            status='temporary'
+        ).first()
+        
+        if reservation:
+            # Remove a reserva
+            db.session.delete(reservation)
+            db.session.commit()
+            
+            # Atualiza contagem de vagas
+            event = Event.query.get(event_id)
+            if event:
+                socketio.emit('update_event_slots', {
+                    'event_id': event_id,
+                    'available_slots': event.total_slots - len(event.reservations),
+                    'total_slots': event.total_slots,
+                    'reservation_count': len(event.reservations)
+                }, broadcast=True)
+        
+        return Response(status=200)
+        
+    except Exception as e:
+        print(f"Erro ao cancelar reserva na página fechada: {str(e)}")
+        db.session.rollback()
+        return Response(status=500)

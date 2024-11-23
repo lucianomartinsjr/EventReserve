@@ -22,7 +22,7 @@ def broadcast_event_update(event_id):
             'available_slots': vacancies,
             'total_slots': event.total_slots,
             'reservation_count': len(event.reservations)
-        }, to=None)
+        })
 
 @socketio.on('connect')
 def handle_connect(auth=None):
@@ -53,7 +53,7 @@ def handle_connect(auth=None):
         'queue': list(events_manager.waiting_queue),
         'max_users': events_manager.max_users,
         'browser_info': events_manager.user_browser_info
-    }, broadcast=True)
+    })
     emit('update_online_users', {'count': len(online_users)}, broadcast=True)
     events = Event.query.all()
     for event in events:
@@ -63,6 +63,26 @@ def handle_connect(auth=None):
 def handle_disconnect():
     user_id = request.sid
     print(f"Usuário {user_id} desconectou")
+    
+    try:
+        # Cancela todas as reservas temporárias do usuário
+        temp_reservations = Reservation.query.filter_by(
+            session_id=user_id,
+            status='temporary'
+        ).all()
+        
+        for reservation in temp_reservations:
+            event_id = reservation.event_id
+            db.session.delete(reservation)
+            db.session.commit()
+            
+            # Broadcast da atualização de vagas
+            broadcast_event_update(event_id)
+    
+    except Exception as e:
+        print(f"Erro ao limpar reservas temporárias na desconexão: {str(e)}")
+        db.session.rollback()
+    
     events_manager.remove_user(user_id)
     events_manager.cleanup_disconnected_users()
     online_users.discard(request.sid)
@@ -71,8 +91,8 @@ def handle_disconnect():
     emit('update_users_status', {
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue)
-    }, to=None)
-    emit('update_online_users', {'count': len(online_users)}, to=None)
+    }, broadcast=True)
+    emit('update_online_users', {'count': len(online_users)}, broadcast=True)
 
 @socketio.on('reserve_event')
 def handle_reserve_event(data):
@@ -109,7 +129,7 @@ def handle_reserve_event(data):
             'queue': list(events_manager.waiting_queue),
             'reserving_user': user_id,
             'event_id': event_id
-        }, broadcast=True)
+        })
         
         # Atualizar contagem de vagas para todos
         broadcast_event_update(event_id)
@@ -159,7 +179,7 @@ def handle_interaction_timeout():
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue),
         'max_users': events_manager.max_users
-    }, to=None)
+    })
 
 @socketio.on('confirm_reservation')
 def handle_confirm_reservation(data):
@@ -176,7 +196,10 @@ def handle_confirm_reservation(data):
     
     if reservation:
         try:
-            if datetime.now(UTC) > reservation.expires_at:
+            current_time = datetime.now(UTC)
+            expires_at = reservation.expires_at.replace(tzinfo=UTC) if reservation.expires_at else None
+            
+            if expires_at and current_time > expires_at:
                 db.session.delete(reservation)
                 db.session.commit()
                 emit('error', {'message': 'O tempo para confirmar a reserva expirou'})
@@ -217,17 +240,20 @@ def handle_cancel_reservation(data):
     user_id = request.sid
     
     try:
+        # Busca a reserva temporária
         reservation = Reservation.query.filter_by(
             id=reservation_id,
             event_id=event_id,
-            session_id=user_id
-        ).with_for_update().first()
+            session_id=user_id,
+            status='temporary'  # Garante que só cancela reservas temporárias
+        ).first()
         
         if reservation:
             # Calcula o tempo restante antes de cancelar a reserva
-            time_elapsed = (datetime.now(UTC) - reservation.created_at).total_seconds()
+            time_elapsed = (datetime.now(UTC) - reservation.created_at.replace(tzinfo=UTC)).total_seconds()
             remaining_interaction_time = max(0, events_manager.queue_timeout - time_elapsed)
             
+            # Remove a reserva
             db.session.delete(reservation)
             db.session.commit()
             
@@ -237,8 +263,9 @@ def handle_cancel_reservation(data):
                 'queue': list(events_manager.waiting_queue),
                 'reserving_user': None,
                 'event_id': None
-            }, broadcast=True)
+            })
             
+            # Broadcast da atualização de vagas
             broadcast_event_update(event_id)
             
             emit('reservation_cancelled', {
@@ -251,8 +278,37 @@ def handle_cancel_reservation(data):
             emit('error', {'message': 'Reserva não encontrada ou já expirada'})
             
     except Exception as e:
+        print(f"Erro ao cancelar reserva: {str(e)}")
         db.session.rollback()
         emit('error', {'message': 'Erro ao cancelar reserva'})
+
+# Adicionar novo handler para modal fechado
+@socketio.on('modal_closed')
+def handle_modal_closed(data):
+    event_id = data.get('event_id')
+    reservation_id = data.get('reservation_id')
+    user_id = request.sid
+    
+    try:
+        # Busca a reserva temporária
+        reservation = Reservation.query.filter_by(
+            id=reservation_id,
+            event_id=event_id,
+            session_id=user_id,
+            status='temporary'
+        ).first()
+        
+        if reservation:
+            # Remove a reserva
+            db.session.delete(reservation)
+            db.session.commit()
+            
+            # Broadcast da atualização de vagas
+            broadcast_event_update(event_id)
+            
+    except Exception as e:
+        print(f"Erro ao limpar reserva após fechar modal: {str(e)}")
+        db.session.rollback()
 
 @socketio.on('create_temporary_reservation')
 def handle_create_temporary_reservation(data):
@@ -305,4 +361,4 @@ def handle_browser_info(data):
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue),
         'browser_info': events_manager.user_browser_info
-    }, broadcast=True)
+    })

@@ -1,6 +1,6 @@
 from threading import Lock
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from app import db, socketio
 from app.models import Settings
 
@@ -39,7 +39,7 @@ class EventsManager:
                 return True
                 
             self.waiting_queue.append(user_id)
-            self.user_queue_times[user_id] = datetime.utcnow()
+            self.user_queue_times[user_id] = datetime.now(UTC)
             return False
             
     def set_user_browser_info(self, user_id, browser_info):
@@ -57,7 +57,7 @@ class EventsManager:
             self.user_browser_info.pop(user_id, None)
             
     def _clean_expired_queue_users(self):
-        current_time = datetime.utcnow()
+        current_time = datetime.now(UTC)
         expired_users = []
         
         for user_id in list(self.waiting_queue):
@@ -99,7 +99,7 @@ class EventsManager:
         if not queue_time:
             return None
         
-        elapsed = (datetime.utcnow() - queue_time).total_seconds()
+        elapsed = (datetime.now(UTC) - queue_time).total_seconds()
         remaining = max(0, self.queue_timeout - elapsed)
         return int(remaining)
         
@@ -108,7 +108,7 @@ class EventsManager:
             if user_id in self.active_users:
                 self.active_users.remove(user_id)
                 self.waiting_queue.append(user_id)
-                self.user_queue_times[user_id] = datetime.utcnow()
+                self.user_queue_times[user_id] = datetime.now(UTC)
                 
                 # Processa o próximo usuário da fila
                 next_user = self._process_queue()
