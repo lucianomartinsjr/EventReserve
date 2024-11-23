@@ -15,7 +15,7 @@ class Reservation(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
     user_name = db.Column(db.String(100))
     user_phone = db.Column(db.String(20))
-    status = db.Column(db.String(20), default='temporary')  # 'temporary' ou 'confirmed'
+    status = db.Column(db.String(20), default='temporary')  
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(UTC))
     expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
     session_id = db.Column(db.String(100))
@@ -23,9 +23,9 @@ class Reservation(db.Model):
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     max_users = db.Column(db.Integer, default=3)
-    choice_timeout = db.Column(db.Integer, default=30)  # tempo em segundos para escolher
-    queue_timeout = db.Column(db.Integer, default=120)   # tempo em segundos na fila
-    max_events = db.Column(db.Integer, default=10)        # máximo de eventos por usuário
+    choice_timeout = db.Column(db.Integer, default=30)  
+    queue_timeout = db.Column(db.Integer, default=120)   
+    max_events = db.Column(db.Integer, default=10)       
     
     @classmethod
     def get_settings(cls):

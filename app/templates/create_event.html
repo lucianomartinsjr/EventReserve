@@ -10,20 +10,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
             min-height: 100vh;
         }
         
         .navbar {
-            background: transparent !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             margin-bottom: 2rem;
         }
         
         .navbar-brand {
-            color: white !important;
+            color: #2c5282 !important;
             font-weight: 600;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
             transition: all 0.3s ease;
+        }
+        
+        .navbar-brand i {
+            color: #2c5282 !important;
         }
         
         .navbar-brand:hover {
@@ -31,43 +37,62 @@
         }
         
         .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .card-header {
+            background: transparent !important;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 1.5rem !important;
+        }
+        
+        .card-header h4 {
+            color: #2c5282;
+        }
+        
+        .card-header i {
+            color: #2c5282;
         }
         
         .btn {
-            border-radius: 10px;
-            padding: 8px 16px;
+            border-radius: 8px;
+            padding: 10px 20px;
             transition: all 0.3s ease;
         }
         
         .btn-primary {
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
             border: none;
         }
         
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         
         .form-control {
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            padding: 10px 15px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 12px 15px;
             transition: all 0.3s ease;
         }
         
         .form-control:focus {
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.1);
+            border-color: #2c5282;
         }
         
-        .card-header {
-            background: linear-gradient(to right, #667eea, #764ba2) !important;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 1.5rem !important;
+        .form-label {
+            color: #4a5568;
+            font-weight: 500;
+        }
+        
+        .text-danger {
+            color: #c53030 !important;
         }
         
         /* Responsividade */
@@ -81,7 +106,7 @@
             }
             
             .btn {
-                padding: 6px 12px;
+                padding: 8px 16px;
                 font-size: 0.9rem;
             }
         }

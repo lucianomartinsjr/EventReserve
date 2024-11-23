@@ -12,25 +12,25 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
             min-height: 100vh;
         }
         
         .navbar {
-            background: transparent !important;
+            background: rgba(255, 255, 255, 0.95) !important;
             backdrop-filter: blur(10px);
-            border: none;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         
         .main-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 12px;
             padding: 2rem;
             margin-top: 2rem;
             margin-bottom: 2rem;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.19);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             width: 95%;
             max-width: 1400px;
             margin-left: auto;
@@ -38,17 +38,18 @@
         }
 
         .event-card {
-            border: none;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
-            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
             background: white;
             padding: 1.5rem;
             margin-bottom: 1rem;
         }
         
         .event-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         
         .btn {
@@ -58,7 +59,7 @@
         }
         
         .btn-reserve {
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
             border: none;
             color: white;
         }
@@ -69,10 +70,11 @@
         }
 
         .sidebar {
-            background: white;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             border-radius: 15px;
             padding: 1.5rem;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.19);
         }
 
         .alert {
@@ -107,7 +109,7 @@
         }
 
         .modal-header.bg-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
             border-radius: 20px 20px 0 0;
             padding: 1.5rem;
         }
@@ -374,7 +376,7 @@
 
         /* Cabeçalho com texto branco */
         .modal-header.bg-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
             color: white;
             border-radius: 20px 20px 0 0;
             padding: 1.5rem;
@@ -407,8 +409,8 @@
 
         /* Alerta do timer */
         .alert-primary {
-            background-color: rgba(102, 126, 234, 0.1);
-            color: #667eea;
+            background-color: rgba(44, 82, 130, 0.1);
+            color: #2c5282;
         }
 
         /* Timer */
@@ -431,10 +433,10 @@
         }
 
         .list-group-item {
-            border: none;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             margin-bottom: 0.5rem;
             border-radius: 10px !important;
-            background-color: #f8f9fa;
+            background-color: #ffffff;
         }
 
         .badge {
@@ -444,11 +446,42 @@
         }
 
         .badge.bg-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+            background: linear-gradient(135deg, #276749 0%, #2f855a 100%) !important;
         }
 
         .badge.bg-warning {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+            background: linear-gradient(135deg, #c05621 0%, #dd6b20 100%) !important;
+        }
+
+        .badge.bg-primary {
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%) !important;
+        }
+
+        /* Ajuste da navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Ajuste do texto da navbar */
+        .navbar-brand {
+            color: #2c5282 !important; /* Azul corporativo */
+            font-weight: 600;
+        }
+
+        .navbar-brand i {
+            color: #2c5282 !important; /* Mesmo azul para o ícone */
+            margin-right: 0.5rem;
+        }
+
+        /* Ajuste do badge de usuários online */
+        .user-status .badge {
+            background: linear-gradient(135deg, #276749 0%, #2f855a 100%) !important;
+            color: white;
+            padding: 0.5rem 1rem;
+            font-weight: normal;
         }
     </style>
 </head>
@@ -1093,7 +1126,6 @@
                 reservationModal.hide();
             }
             
-            // Reinicia o timer da fila
             socket.emit('request_queue_time');
             isModalOpen = false;
         }
