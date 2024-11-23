@@ -48,13 +48,13 @@ def handle_connect(auth=None):
         })
     
     online_users.add(request.sid)
-    emit('update_users_status', {
+    socketio.emit('update_users_status', {
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue),
         'max_users': events_manager.max_users,
         'browser_info': events_manager.user_browser_info
     })
-    emit('update_online_users', {'count': len(online_users)}, broadcast=True)
+    socketio.emit('update_online_users', {'count': len(online_users)})
     events = Event.query.all()
     for event in events:
         broadcast_event_update(event.id)
@@ -64,35 +64,25 @@ def handle_disconnect():
     user_id = request.sid
     print(f"Usuário {user_id} desconectou")
     
-    try:
-        # Cancela todas as reservas temporárias do usuário
-        temp_reservations = Reservation.query.filter_by(
-            session_id=user_id,
-            status='temporary'
-        ).all()
-        
-        for reservation in temp_reservations:
-            event_id = reservation.event_id
-            db.session.delete(reservation)
-            db.session.commit()
-            
-            # Broadcast da atualização de vagas
-            broadcast_event_update(event_id)
-    
-    except Exception as e:
-        print(f"Erro ao limpar reservas temporárias na desconexão: {str(e)}")
-        db.session.rollback()
-    
     events_manager.remove_user(user_id)
+    
+
+    next_user = events_manager._process_queue()
+    if next_user:
+        emit('access_granted', room=next_user)
+        emit('start_interaction_timer', {
+            'timeout': events_manager.queue_timeout
+        }, room=next_user)
+    
     events_manager.cleanup_disconnected_users()
     online_users.discard(request.sid)
     
-    # Emite atualização de status para todos os usuários
-    emit('update_users_status', {
+    # Emitir atualizações para todos os usuários conectados
+    socketio.emit('update_users_status', {
         'active_users': list(events_manager.active_users),
         'queue': list(events_manager.waiting_queue)
-    }, broadcast=True)
-    emit('update_online_users', {'count': len(online_users)}, broadcast=True)
+    })
+    socketio.emit('update_online_users', {'count': len(online_users)})
 
 @socketio.on('reserve_event')
 def handle_reserve_event(data):
