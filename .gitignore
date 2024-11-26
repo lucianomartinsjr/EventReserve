@@ -61,6 +61,3 @@ temp/
 uploads/
 media/
 
-# Arquivos de configuração local
-instance/
-config.py
