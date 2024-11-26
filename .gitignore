@@ -30,7 +30,6 @@ wheels/
 
 # Arquivos de ambiente
 .env
-.env.*
 .flaskenv
 
 # Logs
