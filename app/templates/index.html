@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reserva de Eventos</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            width: 95%;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .event-card {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .event-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn {
+            border-radius: 10px;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-reserve {
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
+            border: none;
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
+        }
+
+        .alert {
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Ajustes para responsividade */
+        @media (max-width: 576px) {
+            .main-container {
+                padding: 1rem;
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .btn {
+                padding: 6px 12px;
+                font-size: 0.9rem;
+            }
+            
+            .event-card {
+                padding: 1rem;
+            }
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+
+        .modal-header.bg-gradient {
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
+            border-radius: 20px 20px 0 0;
+            padding: 1.5rem;
+        }
+
+        .modal-header.bg-gradient .modal-title {
+            color: #333333;
+        }
+
+        .modal-header.bg-gradient .btn-close {
+            filter: none;
+            color: #333333;
+            opacity: 0.8;
+        }
+
+        .modal-header.bg-gradient .btn-close:hover {
+            opacity: 1;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: black;
+        }
+
+        .form-control {
+            background: #ffffff;
+            border: 2px solid #e9ecef;
+            color: #333;
+        }
+
+        .form-control:focus {
+            background: #ffffff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .modal-footer .btn {
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 500;
+            min-width: 160px;
+            transition: all 0.3s ease;
+        }
+
+        .modal-footer .btn-outline-secondary {
+            border: 2px solid #6c757d;
+        }
+
+        .modal-footer .btn-outline-secondary:hover {
+            background: #6c757d;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Estilos Base */
+        .main-container {
+            width: 95%;
+            max-width: 1400px;
+            margin: 1rem auto;
+            padding: 1rem;
+        }
+
+        /* Ajustes do Modal */
+        .modal-dialog {
+            max-width: 400px;
+            margin: 1.75rem auto;
+        }
+
+        .modal-content {
+            border: none;
+            border-radius: 15px;
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+        }
+
+        .form-control-lg {
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            height: auto;
+        }
+
+        .modal-footer {
+            padding: 1rem;
+            gap: 0.5rem;
+        }
+
+        .modal-footer .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            min-width: 100px;
+        }
+
+        /* Breakpoints Específicos */
+        @media (max-width: 1200px) {
+            .event-card {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .sidebar {
+                margin-top: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                width: 98%;
+                padding: 0.8rem;
+            }
+
+            .modal-dialog {
+                width: 95%;
+                margin: 0.5rem auto;
+            }
+
+            .event-card {
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .navbar {
+                padding: 0.5rem;
+            }
+
+            .modal-content {
+                margin: 5px;
+            }
+
+            .modal-header {
+                padding: 1rem;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+
+            .modal-footer .btn {
+                width: 100%;
+                margin: 0.25rem 0;
+            }
+
+            .badge {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+        }
+
+        /* Ajustes para telas muito pequenas */
+        @media (max-width: 360px) {
+            .modal-body {
+                padding: 0.8rem;
+            }
+
+            .form-label {
+                font-size: 0.9rem;
+            }
+
+            .alert {
+                padding: 0.8rem;
+                font-size: 0.9rem;
+            }
+
+            .modal-title {
+                font-size: 1.2rem;
+            }
+        }
+
+        /* Ajustes para telas muito grandes */
+        @media (min-width: 1400px) {
+            .main-container {
+                max-width: 1600px;
+            }
+
+            .modal-dialog {
+                max-width: 600px;
+            }
+        }
+
+        /* Ajustes de Acessibilidade */
+        @media (prefers-reduced-motion: reduce) {
+            .btn, .event-card, .modal {
+                transition: none;
+            }
+        }
+
+        /* Suporte para Dark Mode */
+        @media (prefers-color-scheme: dark) {
+            .modal-content,
+            .modal-body,
+            .form-control {
+                background: #ffffff;
+                color: #333;
+            }
+
+            .form-control {
+                border-color: #e9ecef;
+            }
+
+            .alert-primary {
+                background-color: rgba(102, 126, 234, 0.1);
+                color: #667eea;
+            }
+        }
+
+        /* Ajustes para diferentes orientações */
+        @media screen and (orientation: landscape) and (max-height: 576px) {
+            .modal-dialog {
+                height: 98vh;
+                overflow-y: auto;
+            }
+
+            .modal-body {
+                max-height: 60vh;
+                overflow-y: auto;
+            }
+        }
+
+        /* Utilitários de Espaçamento Responsivo */
+        .mb-responsive {
+            margin-bottom: clamp(1rem, 3vw, 2rem);
+        }
+
+        .p-responsive {
+            padding: clamp(0.8rem, 2vw, 1.5rem);
+        }
+
+        /* Estilos do botão fechar */
+        .modal-header .btn-close {
+            background-color: transparent;
+            opacity: 0.8;
+            padding: 0.5rem;
+            margin: 0;
+            transition: all 0.3s ease;
+        }
+
+        .modal-header .btn-close:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* Ajuste da cor do ícone X */
+        .modal-header .btn-close {
+            filter: invert(1) grayscale(100%) brightness(200%);
+        }
+
+        /* Ajuste para telas menores */
+        @media (max-width: 576px) {
+            .modal-header .btn-close {
+                padding: 0.25rem;
+            }
+        }
+
+        /* Estilos do Modal */
+        .modal-content {
+            background: #ffffff;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+
+        /* Cabeçalho com texto branco */
+        .modal-header.bg-gradient {
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            padding: 1.5rem;
+        }
+
+        /* Corpo do modal com texto escuro */
+        .modal-body {
+            background: #ffffff;
+            color: #333333;
+        }
+
+        /* Labels do formulário */
+        .form-label {
+            color: #333333;
+            font-weight: 600;
+        }
+
+        /* Campos de input */
+        .form-control {
+            background: #ffffff;
+            border: 2px solid #e9ecef;
+            color: #333333;
+        }
+
+        .form-control:focus {
+            background: #ffffff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        /* Alerta do timer */
+        .alert-primary {
+            background-color: rgba(44, 82, 130, 0.1);
+            color: #2c5282;
+        }
+
+        /* Timer */
+        #modal-timer {
+            color: #333333;
+        }
+
+        /* Footer do modal */
+        .modal-footer {
+            background: #ffffff;
+        }
+
+        /* Botões */
+        .modal-footer .btn-outline-secondary {
+            color: #6c757d;
+        }
+
+        .modal-footer .btn-reserve {
+            color: white;
+        }
+
+        .list-group-item {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            margin-bottom: 0.5rem;
+            border-radius: 10px !important;
+            background-color: #ffffff;
+        }
+
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: normal;
+        }
+
+        .badge.bg-success {
+            background: linear-gradient(135deg, #276749 0%, #2f855a 100%) !important;
+        }
+
+        .badge.bg-warning {
+            background: linear-gradient(135deg, #c05621 0%, #dd6b20 100%) !important;
+        }
+
+        .badge.bg-primary {
+            background: linear-gradient(135deg, #2c5282 0%, #1a365d 100%) !important;
+        }
+
+        /* Ajuste da navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Ajuste do texto da navbar */
+        .navbar-brand {
+            color: #2c5282 !important; /* Azul corporativo */
+            font-weight: 600;
+        }
+
+        .navbar-brand i {
+            color: #2c5282 !important; /* Mesmo azul para o ícone */
+            margin-right: 0.5rem;
+        }
+
+        /* Ajuste do badge de usuários online */
+        .user-status .badge {
+            background: linear-gradient(135deg, #276749 0%, #2f855a 100%) !important;
+            color: white;
+            padding: 0.5rem 1rem;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-calendar-check"></i> EventReserve
+            </a>
+            <div class="user-status">
+                <span class="badge bg-success">
+                    <i class="fas fa-users"></i> Usuários Online: <span id="online-users">0</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Status da Fila e Timer -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div id="queue-status" class="alert alert-info d-none">
+                    <i class="fas fa-hourglass-half me-2"></i>
+                    Você está na fila de espera. Posição: <span id="queue-position">0</span>
+                </div>
+
+                <div id="timer-container" class="alert alert-warning d-none">
+                    <i class="fas fa-clock me-2"></i>
+                    Tempo restante para escolha: <span id="timer" class="countdown">0</span>
+                </div>
+
+                <div id="reservation-timer" class="alert alert-warning d-none">
+                    <i class="fas fa-clock me-2"></i>
+                    Tempo restante para confirmar a reserva: <span id="reservation-countdown">0</span> segundos
+                </div>
+            </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div class="row">
+            <div class="col-md-8">
+                <h2 class="section-title">Eventos Disponíveis</h2>
+                <div class="row" id="events-container">
+                    {% for event in events %}
+                    <div class="col-md-6 mb-4">
+                        <div class="event-card" data-event-id="{{ event.id }}">
+                            <div class="event-header">
+                                <h3>{{ event.name }}</h3>
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-ticket-alt"></i>
+                                    {{ event.total_slots - event.reservation_count }} vagas
+                                </span>
+                            </div>
+                            <div class="event-body">
+                                <button class="btn btn-reserve" 
+                                        onclick="reserveEvent('{{ event.id }}')"
+                                        {% if event.total_slots - event.reservation_count <= 0 %} disabled="disabled" {% endif %}>
+                                    <i class="fas fa-bookmark"></i>
+                                    {% if event.total_slots - event.reservation_count > 0 %}
+                                        Reservar
+                                    {% else %}
+                                        Esgotado
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-md-4">
+                <div class="sidebar">
+                    <!-- Adicionar seção de sessões ativas -->
+                    <div class="active-users-list mb-4">
+                        <h3><i class="fas fa-user-check"></i> Sessões Ativas</h3>
+                        <ul id="active-users" class="list-group">
+                            <!-- Preenchido via JavaScript -->
+                        </ul>
+                    </div>
+                    
+                    <div class="queue-list">
+                        <h3><i class="fas fa-list"></i> Fila de Espera</h3>
+                        <ul id="waiting-queue" class="list-group">
+                            <!-- Preenchido via JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const maxActiveUsers = 3;
+
+        // Adicione estas variáveis globais no início do script
+        let queueTimer;
+        let isModalOpen = false;
+
+        // Função para obter informações do navegador
+        function getBrowserInfo() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            let browser = '';
+            let icon = '';
+            let platform = '';
+
+            // Detecção mais precisa do navegador
+            if (userAgent.includes('edg/')) {
+                browser = 'Edge';
+                icon = 'fab fa-edge';
+            } else if (userAgent.includes('chrome/') && !userAgent.includes('edg/')) {
+                browser = 'Chrome';
+                icon = 'fab fa-chrome';
+            } else if (userAgent.includes('firefox/')) {
+                browser = 'Firefox';
+                icon = 'fab fa-firefox';
+            } else if (userAgent.includes('safari/') && !userAgent.includes('chrome/')) {
+                browser = 'Safari';
+                icon = 'fab fa-safari';
+            } else if (userAgent.includes('opr/')) {
+                browser = 'Opera';
+                icon = 'fab fa-opera';
+            } else {
+                browser = 'Navegador';
+                icon = 'fas fa-globe';
+            }
+
+            // Detecção mais precisa da plataforma
+            if (/android/i.test(userAgent)) {
+                platform = 'Android';
+            } else if (/iphone|ipad|ipod/i.test(userAgent)) {
+                platform = 'iOS';
+            } else if (/macintosh/i.test(userAgent)) {
+                platform = 'macOS';
+            } else if (/windows/i.test(userAgent)) {
+                platform = 'Windows';
+            } else if (/linux/i.test(userAgent)) {
+                platform = 'Linux';
+            } else {
+                platform = 'Desktop';
+            }
+
+            return { browser, icon, platform };
+        }
+
+        // Enviar informações do navegador ao conectar
+        socket.on('connect', function() {
+            const browserInfo = getBrowserInfo();
+            socket.emit('browser_info', browserInfo);
+            socket.emit('join_queue');
+            socket.emit('request_user_count');
+        });
+
+        // Atualiza a contagem de usuários online
+        socket.on('update_online_users', function(data) {
+            document.getElementById('online-users').textContent = data.count;
+        });
+
+        // Função para reservar um evento
+        function reserveEvent(eventId) {
+            const button = document.querySelector(`[data-event-id="${eventId}"] .btn-reserve`);
+            if (button) {
+                button.disabled = true;
+            }
+            
+            // Pausa o timer da fila quando vai fazer a reserva
+            if (queueTimer) {
+                clearInterval(queueTimer);
+            }
+            
+            socket.emit('reserve_event', { event_id: eventId });
+            isModalOpen = true; // Marca que o modal está aberto
+            
+            setTimeout(() => {
+                if (button && !currentReservationId) {
+                    button.disabled = false;
+                }
+            }, 3000);
+        }
+
+        // Atualizar o listener de show_reservation_modal
+        socket.on('show_reservation_modal', function(data) {
+            console.log('Recebido show_reservation_modal:', data); // Debug
+            currentEventId = data.event_id;
+            currentReservationId = data.reservation_id;
+            
+            // Limpa os campos do formulário
+            document.getElementById('userName').value = '';
+            document.getElementById('userPhone').value = '';
+            
+            // Abre o modal
+            const reservationModal = new bootstrap.Modal(document.getElementById('reservationModal'));
+            reservationModal.show();
+            
+            // Converte o timeout para segundos se estiver em minutos
+            let timeLeft = data.timeout;
+            console.log('Tempo inicial:', timeLeft); // Debug
+            
+            if (modalTimer) {
+                clearInterval(modalTimer);
+            }
+            
+            const updateTimer = () => {
+                // Garante que o tempo está sendo tratado como segundos
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                
+                // Debug
+                console.log(`Tempo restante: ${minutes}:${seconds} (total segundos: ${timeLeft})`);
+                
+                // Formata o tempo com dois dígitos
+                document.getElementById('modal-timer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearInterval(modalTimer);
+                    reservationModal.hide();
+                    socket.emit('reservation_expired', { 
+                        reservation_id: currentReservationId 
+                    });
+                    currentEventId = null;
+                    currentReservationId = null;
+                }
+            };
+            
+            updateTimer(); // Atualiza imediatamente
+            modalTimer = setInterval(updateTimer, 1000); // Atualiza a cada segundo
+        });
+
+        // Adicione estas variáveis globais
+        let currentReservingUser = null;
+        let currentReservingEvent = null;
+
+        // Função atualizada para criar o item da lista
+        function createUserListItem(user, isQueue = false, queuePosition = null) {
+            const browserInfo = socket.browserInfo?.[user] || { 
+                browser: 'Desconhecido', 
+                icon: 'fas fa-globe', 
+                platform: 'Desconhecido' 
+            };
+            const isReserving = user === currentReservingUser;
+            
+            const status = isQueue ? {
+                text: `Posição ${queuePosition + 1}`,
+                class: 'bg-warning text-dark',
+                icon: 'fa-clock'
+            } : {
+                text: isReserving ? 'Confirmando reserva' : 'Apto para selecionar',
+                class: isReserving ? 'bg-warning text-dark' : 'bg-success',
+                icon: isReserving ? 'fa-clock' : 'fa-check-circle'
+            };
+
+            return `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="d-flex flex-column">
+                        <div>
+                            <i class="fas ${isQueue ? 'fa-clock' : 'fa-user'}"></i>
+                            Session_${user.slice(-6).toUpperCase()}
+                            ${user === socket.id ? ' (Você)' : ''}
+                        </div>
+                        <small class="text-muted">
+                            <i class="${browserInfo.icon}"></i> ${browserInfo.browser} em ${browserInfo.platform}
+                        </small>
+                    </div>
+                    <span class="badge ${status.class}">
+                        <i class="fas ${status.icon} me-1"></i>
+                        ${status.text}
+                    </span>
+                </li>
+            `;
+        }
+
+        // Atualizar o listener de status
+        socket.on('update_users_status', function(data) {
+            socket.browserInfo = data.browser_info;  // Armazena as informações do navegador
+            const activeList = document.getElementById('active-users');
+            const queueList = document.getElementById('waiting-queue');
+            
+            activeList.innerHTML = data.active_users
+                .map(user => createUserListItem(user))
+                .join('');
+            
+            queueList.innerHTML = data.queue
+                .map((user, index) => createUserListItem(user, true, index))
+                .join('');
+        });
+
+        // Função para desabilitar todos os cards
+        function disableAllCards() {
+            const cards = document.querySelectorAll('.event-card');
+            cards.forEach(card => {
+                card.classList.add('disabled');
+            });
+        }
+
+        // Função para habilitar todos os cards
+        function enableAllCards() {
+            const cards = document.querySelectorAll('.event-card');
+            cards.forEach(card => {
+                card.classList.remove('disabled');
+            });
+        }
+
+        // Atualiza o status da fila
+        socket.on('in_queue', function(data) {
+            document.getElementById('queue-status').classList.remove('d-none');
+            document.getElementById('queue-position').textContent = data.position;
+            disableAllCards(); // Desabilita os cards quando estiver na fila
+        });
+
+        // Atualiza o timer
+        socket.on('update_timer', function(data) {
+            document.getElementById('timer-container').classList.remove('d-none');
+            document.getElementById('timer').textContent = data.time;
+        });
+
+        // Gerencia o temporizador para interação
+        socket.on('start_interaction_timer', function(data) {
+            console.log('Timeout recebido do servidor:', data.timeout);
+            document.getElementById('timer-container').classList.remove('d-none');
+            let timeLeft = data.timeout;
+            
+            if (!isModalOpen) { // Só inicia o timer se o modal não estiver aberto
+                if (queueTimer) {
+                    clearInterval(queueTimer);
+                }
+                
+                const updateInteractionTimer = () => {
+                    document.getElementById('timer').textContent = timeLeft;
+                    timeLeft--;
+                    
+                    if (timeLeft < 0) {
+                        clearInterval(queueTimer);
+                        document.getElementById('timer-container').classList.add('d-none');
+                        socket.emit('interaction_timeout');
+                    }
+                };
+
+                updateInteractionTimer();
+                queueTimer = setInterval(updateInteractionTimer, 1000);
+            }
+        });
+
+        // Para o temporizador quando o usuário sai da fila
+        socket.on('stop_timer', function() {
+            clearInterval(timerInterval);
+            document.getElementById('timer-container').classList.add('d-none');
+        });
+
+        // Adicione estas novas funções para gerenciar o timer de reserva
+        let reservationTimerInterval;
+
+        socket.on('reservation_created', function(data) {
+            // Mostra o timer de reserva
+            document.getElementById('reservation-timer').classList.remove('d-none');
+            let timeLeft = data.timeout;
+            
+            // Atualiza o contador
+            const updateTimer = () => {
+                document.getElementById('reservation-countdown').textContent = timeLeft;
+                timeLeft--;
+                
+                if (timeLeft < 0) {
+                    clearInterval(reservationTimerInterval);
+                    document.getElementById('reservation-timer').classList.add('d-none');
+                }
+            };
+
+            // Inicia o contador
+            updateTimer();
+            reservationTimerInterval = setInterval(updateTimer, 1000);
+        });
+
+        // Limpa o timer quando necessário
+        socket.on('reservation_confirmed', function() {
+            clearInterval(reservationTimerInterval);
+            document.getElementById('reservation-timer').classList.add('d-none');
+        });
+
+        // Adicione esta nova função para gerenciar o timer de interação
+        let interactionTimerInterval;
+
+        socket.on('access_granted', function() {
+            document.getElementById('queue-status').classList.add('d-none');
+            enableAllCards(); // Habilita os cards quando sair da fila
+        });
+
+        socket.on('moved_to_queue', function(data) {
+            document.getElementById('timer-container').classList.add('d-none');
+            
+            const queueStatus = document.getElementById('queue-status');
+            queueStatus.classList.remove('d-none');
+            document.getElementById('queue-position').textContent = data.position;
+            
+            disableAllCards(); // Desabilita os cards quando for movido para a fila
+            
+            // Mostra mensagem informativa
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Tempo esgotado!</strong> Você foi movido para o final da fila na posição ${data.position}.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        });
+
+        // Limpa o timer quando o usuário desconectar
+        socket.on('disconnect', function() {
+            if (interactionTimerInterval) {
+                clearInterval(interactionTimerInterval);
+            }
+            document.getElementById('timer-container').classList.add('d-none');
+            disableAllCards(); // Desabilita os cards quando desconectar
+        });
+
+        let reservationTimer;
+
+        socket.on('reservation_created', function(data) {
+            // Inicia o timer com o timeout recebido do servidor
+            startReservationTimer(data.timeout);
+            
+            // Redireciona para a página de confirmação
+            window.location.href = `/reserve/${data.event_id}`;
+        });
+
+        function startReservationTimer(timeout) {
+            // Armazena o timestamp de expiração no localStorage
+            const expirationTime = Date.now() + (timeout * 1000);
+            localStorage.setItem('reservationExpiration', expirationTime);
+        }
+
+        // Adicionar função para verificar o timer na página de reserva
+        function checkReservationTimer() {
+            const expirationTime = localStorage.getItem('reservationExpiration');
+            if (expirationTime) {
+                const timeLeft = expirationTime - Date.now();
+                if (timeLeft <= 0) {
+                    // Tempo expirou
+                    window.location.href = '/';
+                    return;
+                }
+                
+                // Atualiza o contador na tela (se desejar mostrar)
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                document.getElementById('timer').textContent = 
+                    `Tempo restante: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Adicionar na página de reserva
+        if (document.getElementById('timer')) {
+            setInterval(checkReservationTimer, 1000);
+        }
+
+        // Atualização das vagas em tempo real
+        socket.on('update_event_slots', function(data) {
+            const eventCard = document.querySelector(`[data-event-id="${data.event_id}"]`);
+            if (eventCard) {
+                // Atualiza o badge com o número de vagas
+                const badgeElement = eventCard.querySelector('.badge.bg-primary');
+                if (badgeElement) {
+                    badgeElement.innerHTML = `<i class="fas fa-ticket-alt"></i> ${data.available_slots} vagas`;
+                }
+                
+                // Atualiza o botão de reserva
+                const reserveButton = eventCard.querySelector('.btn-reserve');
+                if (reserveButton) {
+                    if (data.available_slots > 0) {
+                        reserveButton.disabled = false;
+                        reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Reservar';
+                    } else {
+                        reserveButton.disabled = true;
+                        reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Esgotado';
+                    }
+                }
+            }
+        });
+
+        // Adicionar handler para erros
+        socket.on('error', function(data) {
+            console.log('Erro recebido:', data); // Debug
+            const button = document.querySelector('.btn-reserve[disabled]');
+            if (button) {
+                button.disabled = false;
+            }
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Erro!</strong> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        });
+
+        // Adicionar handler para reserva confirmada
+        socket.on('reservation_success', function(data) {
+            if (modalTimer) {
+                clearInterval(modalTimer);
+            }
+            
+            // Fecha o modal
+            const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+            if (reservationModal) {
+                reservationModal.hide();
+            }
+            
+            // Atualiza o número de vagas no card do evento
+            const eventCard = document.querySelector(`[data-event-id="${currentEventId}"]`);
+            if (eventCard) {
+                const slotsElement = eventCard.querySelector('.badge.bg-primary');
+                if (slotsElement) {
+                    const newSlots = parseInt(data.available_slots);
+                    slotsElement.innerHTML = `<i class="fas fa-ticket-alt"></i> ${newSlots} vagas`;
+                    
+                    // Atualiza o botão de reserva se necessário
+                    const reserveButton = eventCard.querySelector('.btn-reserve');
+                    if (reserveButton) {
+                        if (newSlots <= 0) {
+                            reserveButton.disabled = true;
+                            reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Esgotado';
+                        }
+                    }
+                }
+            }
+            
+            // Mostra mensagem de sucesso estilizada
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Reserva Confirmada!</strong> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            // Limpa as variáveis de controle
+            currentEventId = null;
+            currentReservationId = null;
+            
+            // Remove o alerta após 5 segundos e recarrega a página
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
+        });
+
+        // Adicionar listener para fechar o modal
+        socket.on('close_reservation_modal', function() {
+            const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+            if (reservationModal) {
+                reservationModal.hide();
+            }
+        });
+
+        // Adicione esta nova função para atualizar as barras de progresso
+        socket.on('update_user_timer', function(data) {
+            const { user_id, time_left, total_time } = data;
+            const progressBar = document.querySelector(`#progress-${user_id}`);
+            if (progressBar) {
+                const percentage = (time_left / total_time) * 100;
+                progressBar.style.width = `${percentage}%`;
+                
+                // Muda a cor da barra baseado no tempo restante
+                if (percentage > 60) {
+                    progressBar.className = 'progress-bar bg-info';
+                } else if (percentage > 30) {
+                    progressBar.className = 'progress-bar bg-warning';
+                } else {
+                    progressBar.className = 'progress-bar bg-danger';
+                }
+            }
+        });
+
+        let currentEventId = null;
+        let currentReservationId = null;
+        let modalTimer = null;
+
+        function confirmReservation() {
+            const userName = document.getElementById('userName').value;
+            const userPhone = document.getElementById('userPhone').value;
+
+            if (!userName || !userPhone) {
+                // Mostra mensagem de erro estilizada
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <strong>Erro!</strong> Por favor, preencha todos os campos.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.getElementById('reservationForm').prepend(alertDiv);
+                return;
+            }
+
+            socket.emit('confirm_reservation', {
+                event_id: currentEventId,
+                reservation_id: currentReservationId,
+                user_name: userName,
+                user_phone: userPhone
+            });
+
+            // Limpa o status de reserva
+            currentReservingUser = null;
+            currentReservingEvent = null;
+        }
+
+        function cancelReservation() {
+            if (currentEventId && currentReservationId) {
+                socket.emit('cancel_reservation', {
+                    event_id: currentEventId,
+                    reservation_id: currentReservationId
+                });
+                
+                // Limpa as variáveis de controle
+                currentEventId = null;
+                currentReservationId = null;
+            }
+            
+            if (modalTimer) {
+                clearInterval(modalTimer);
+            }
+            
+            const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+            if (reservationModal) {
+                reservationModal.hide();
+            }
+            
+            socket.emit('request_queue_time');
+            isModalOpen = false;
+        }
+
+        socket.on('reservation_success', function(data) {
+            if (modalTimer) {
+                clearInterval(modalTimer);
+            }
+            
+            // Fecha o modal
+            const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+            if (reservationModal) {
+                reservationModal.hide();
+            }
+            
+            // Atualiza o número de vagas no card do evento
+            const eventCard = document.querySelector(`[data-event-id="${currentEventId}"]`);
+            if (eventCard) {
+                const slotsElement = eventCard.querySelector('.badge.bg-primary');
+                if (slotsElement) {
+                    const newSlots = parseInt(data.available_slots);
+                    slotsElement.innerHTML = `<i class="fas fa-ticket-alt"></i> ${newSlots} vagas`;
+                    
+                    // Atualiza o botão de reserva se necessário
+                    const reserveButton = eventCard.querySelector('.btn-reserve');
+                    if (reserveButton) {
+                        if (newSlots <= 0) {
+                            reserveButton.disabled = true;
+                            reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Esgotado';
+                        }
+                    }
+                }
+            }
+            
+            // Mostra mensagem de sucesso estilizada
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <strong>Reserva Confirmada!</strong> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.row'));
+            
+            // Limpa as variáveis de controle
+            currentEventId = null;
+            currentReservationId = null;
+            
+            // Remove o alerta após 5 segundos e recarrega a página
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
+        });
+
+        socket.on('error', function(data) {
+            alert(data.message);
+        });
+
+        // Atualizar o listener do modal
+        document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
+            if (currentEventId && currentReservationId) {
+                socket.emit('modal_closed', {
+                    event_id: currentEventId,
+                    reservation_id: currentReservationId
+                });
+                
+                // Limpa as variáveis de controle
+                currentEventId = null;
+                currentReservationId = null;
+            }
+            
+            isModalOpen = false;
+            socket.emit('request_queue_time');
+        });
+
+        // Adicionar este novo listener para atualização das vagas
+        socket.on('update_event_slots', function(data) {
+            const eventCard = document.querySelector(`[data-event-id="${data.event_id}"]`);
+            if (eventCard) {
+                const slotsElement = eventCard.querySelector('.badge.bg-primary');
+                if (slotsElement) {
+                    slotsElement.innerHTML = `<i class="fas fa-ticket-alt"></i> ${data.available_slots} vagas`;
+                }
+                
+                const reserveButton = eventCard.querySelector('.btn-reserve');
+                if (reserveButton) {
+                    if (data.available_slots > 0) {
+                        reserveButton.disabled = false;
+                        reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Reservar';
+                    } else {
+                        reserveButton.disabled = true;
+                        reserveButton.innerHTML = '<i class="fas fa-bookmark"></i> Esgotado';
+                    }
+                }
+            }
+        });
+
+        // Adicionar limpeza das variáveis após cancelamento
+        socket.on('reservation_cancelled', function(data) {
+            currentEventId = null;
+            currentReservationId = null;
+        });
+
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor WebSocket');
+        });
+
+        socket.on('update_event_slots', (data) => {
+            const eventElement = document.querySelector(`[data-event-id="${data.event_id}"]`);
+            if (eventElement) {
+                const availableSlots = data.total_slots - data.reservation_count;
+                
+                // Atualiza o contador de vagas
+                const badgeElement = eventElement.querySelector('.badge');
+                badgeElement.textContent = `${availableSlots} vagas`;
+                
+                // Atualiza o botão de reserva
+                const buttonElement = eventElement.querySelector('.btn-reserve');
+                if (availableSlots <= 0) {
+                    buttonElement.disabled = true;
+                    buttonElement.innerHTML = '<i class="fas fa-bookmark"></i> Esgotado';
+                } else {
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = '<i class="fas fa-bookmark"></i> Reservar';
+                }
+            }
+        });
+
+        // Função para formatar o tempo em MM:SS
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        let timerInterval;
+        let remainingTime;
+
+        socket.on('start_interaction_timer', function(data) {
+            remainingTime = data.timeout;
+            clearInterval(timerInterval);
+            
+            // Atualiza o timer imediatamente
+            document.getElementById('modal-timer').textContent = formatTime(remainingTime);
+            
+            timerInterval = setInterval(function() {
+                remainingTime--;
+                if (remainingTime >= 0) {
+                    document.getElementById('modal-timer').textContent = formatTime(remainingTime);
+                } else {
+                    clearInterval(timerInterval);
+                    // Fechar o modal de reserva se estiver aberto
+                    const reservationModal = bootstrap.Modal.getInstance(document.getElementById('reservationModal'));
+                    if (reservationModal) {
+                        reservationModal.hide();
+                    }
+                    // Limpar a reserva temporária se existir
+                    if (currentEventId && currentReservationId) {
+                        cancelReservation();
+                    }
+                }
+            }, 1000); // Atualiza a cada segundo
+        });
+
+        // Limpar o timer quando o modal for fechado
+        document.getElementById('reservationModal').addEventListener('hidden.bs.modal', function () {
+            clearInterval(timerInterval);
+        });
+
+        window.addEventListener('beforeunload', function(e) {
+            if (currentEventId && currentReservationId) {
+                // Envia evento de página fechada de forma síncrona
+                navigator.sendBeacon(
+                    '/api/cancel_reservation', 
+                    JSON.stringify({
+                        event_id: currentEventId,
+                        reservation_id: currentReservationId,
+                        type: 'page_closed'
+                    })
+                );
+            }
+        });
+    </script>
+
+    <!-- Modal de Tempo Expirado -->
+    <div class="modal fade" id="timeExpiredModal" tabindex="-1" aria-labelledby="timeExpiredModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="timeExpiredModalLabel">
+                        <i class="fas fa-exclamation-triangle"></i> Tempo Expirado
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Seu tempo para escolha do evento expirou! Você será movido para o final da fila.</p>
+                    <p>Nova posição na fila: <span id="newQueuePosition"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adicione este modal antes do fechamento do body -->
+    <div class="modal fade" 
+         id="reservationModal" 
+         tabindex="-1" 
+         aria-labelledby="reservationModalLabel" 
+         aria-hidden="true"
+         data-bs-backdrop="static" 
+         data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 bg-gradient">
+                    <h5 class="modal-title" id="reservationModalLabel">
+                        <i class="fas fa-ticket-alt me-2"></i>Confirmar Reserva
+                    </h5>
+                    <button type="button" 
+                            class="btn-close" 
+                            data-bs-dismiss="modal" 
+                            aria-label="Close"
+                            onclick="cancelReservation()"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-primary border-0 d-flex align-items-center mb-4">
+                        <i class="fas fa-clock fs-4 me-3"></i>
+                        <div>
+                            <strong>Tempo restante</strong>
+                            <div class="fs-4 fw-bold" id="modal-timer">--:--</div>
+                        </div>
+                    </div>
+                    
+                    <form id="reservationForm">
+                        <div class="mb-4">
+                            <label for="userName" class="form-label fw-bold">
+                                <i class="fas fa-user me-2"></i>Nome Completo
+                            </label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="userName" 
+                                   required
+                                   placeholder="Digite seu nome completo">
+                        </div>
+                        <div class="mb-4">
+                            <label for="userPhone" class="form-label fw-bold">
+                                <i class="fas fa-phone me-2"></i>Telefone
+                            </label>
+                            <input type="tel" 
+                                   class="form-control form-control-lg" 
+                                   id="userPhone" 
+                                   required
+                                   placeholder="(00) 00000-0000">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer border-0 p-4">
+                    <button type="button" 
+                            class="btn btn-outline-secondary btn-lg flex-grow-1" 
+                            onclick="cancelReservation()">
+                        <i class="fas fa-times me-2"></i>Cancelar
+                    </button>
+                    <button type="button" 
+                            class="btn btn-reserve btn-lg flex-grow-1" 
+                            onclick="confirmReservation()">
+                        <i class="fas fa-check me-2"></i>Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
