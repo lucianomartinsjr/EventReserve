@@ -1,6 +1,0 @@
-Flask
-Flask-SocketIO
-Flask-SQLAlchemy
-Flask-WTF
-python-dotenv
-eventlet
