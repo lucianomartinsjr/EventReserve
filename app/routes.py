@@ -141,7 +141,12 @@ def logout():
 def create_event():
     form = EventForm()
     if form.validate_on_submit():
-        event = Event(name=form.name.data, date=form.date.data, total_slots=form.total_slots.data)
+        event = Event(
+            name=form.name.data,
+            total_slots=form.total_slots.data,
+            available_slots=form.total_slots.data,
+            date=form.date.data
+        )
         db.session.add(event)
         db.session.commit()
         flash('Evento criado com sucesso!')
